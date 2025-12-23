@@ -1,0 +1,15 @@
+services:
+  sundial-base: &sundial-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: sundial
+    build:
+      context: ../model-services/sundial
+      dockerfile: Dockerfile
+    profiles: ["sundial", "all-models"]
+
+  sundial-128m:
+    <<: *sundial-base
+    environment:
+      - MODEL_ID=thuml/sundial-base-128m

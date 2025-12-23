@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pandas
+pyyaml
+numpy
+torch
+python-dateutil
+scikit-learn
+transformers==4.40.1
+datasets==2.18.0
+accelerate==0.28.0

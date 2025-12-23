@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+torch
+transformers==4.40.1
+python-dateutil

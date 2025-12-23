@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+pydantic
+momentfm
+python-dateutil

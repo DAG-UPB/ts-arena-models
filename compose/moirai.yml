@@ -1,0 +1,31 @@
+services:
+  moirai-base: &moirai-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: moirai
+    build:
+      context: ../model-services/moirai
+      dockerfile: Dockerfile
+    profiles: ["moirai", "all-models"]
+
+  moirai-small:
+    <<: *moirai-base
+    environment:
+      - MODEL_ID=Salesforce/moirai-1.1-R-small
+
+  moirai-base-model:
+    <<: *moirai-base
+    environment:
+      - MODEL_ID=Salesforce/moirai-1.1-R-base
+
+  moirai-large:
+    <<: *moirai-base
+    environment:
+      - MODEL_ID=Salesforce/moirai-1.1-R-large
+
+  moirai-2-small:
+    <<: *moirai-base
+    environment:
+      - MODEL_ID=Salesforce/moirai-2.0-R-small
+

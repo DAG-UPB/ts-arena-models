@@ -1,0 +1,32 @@
+services:
+  timesfm-base: &timesfm-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: timesfm
+    build:
+      context: ../model-services/timesfm
+      dockerfile: Dockerfile
+    profiles: ["timesfm", "all-models"]
+
+  timesfm-1.0-200m:
+    <<: *timesfm-base
+    environment:
+      - MODEL_ID=google/timesfm-1.0-200m-pytorch
+
+  timesfm-2.0-500m:
+    <<: *timesfm-base
+    environment:
+      - MODEL_ID=google/timesfm-2.0-500m-pytorch
+
+  timesfm-2.5-200m:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: timesfm-2.5
+    build:
+      context: ../model-services/timesfm2_5
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_ID=google/timesfm-2.5-200m-pytorch
+    profiles: ["timesfm", "all-models"]

@@ -1,0 +1,20 @@
+services:
+  time-moe-base: &time-moe-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: time-moe
+    build:
+      context: ../model-services/time-moe
+      dockerfile: Dockerfile
+    profiles: ["time-moe", "all-models"]
+
+  time-moe-50m:
+    <<: *time-moe-base
+    environment:
+      - MODEL_ID=Maple728/TimeMoE-50M
+
+  time-moe-200m:
+    <<: *time-moe-base
+    environment:
+      - MODEL_ID=Maple728/TimeMoE-200M

@@ -1,0 +1,25 @@
+services:
+  moment-base: &moment-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: moment
+    build:
+      context: ../model-services/moment
+      dockerfile: Dockerfile
+    profiles: ["moment", "all-models"]
+
+  moment-small:
+    <<: *moment-base
+    environment:
+      - MODEL_ID=AutonLab/MOMENT-1-small
+
+  moment-base-model:
+    <<: *moment-base
+    environment:
+      - MODEL_ID=AutonLab/MOMENT-1-base
+
+  moment-large:
+    <<: *moment-base
+    environment:
+      - MODEL_ID=AutonLab/MOMENT-1-large

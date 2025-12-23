@@ -1,0 +1,367 @@
+{
+
+    "timesfm-2.0-500m": {
+        "name": "google/timesfm-2.0-500m-pytorch",
+        "model_type": "TSFM",
+        "model_family": "timesfm",
+        "model_size": 500,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "TimesFM 1.0 dataset + LOTSA subset",
+        "publishing_date": "2024-10-03",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 2
+    },
+    "timesfm-2.5-200m": {
+        "name": "google/timesfm-2.5-200m-pytorch",
+        "model_type": "TSFM",
+        "model_family": "timesfm",
+        "model_size": 200,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "TimesFM 2.0 dataset",
+        "publishing_date": "2025-09-15",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 2
+    },
+    "sundial-128m": {
+        "name": "thuml/sundial-base-128m",
+        "model_type": "TSFM",
+        "model_family": "sundial",
+        "model_size": 128,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "TimeBench (1 trillion time points)",
+        "publishing_date": "2025-02-01",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 3
+    },
+    "time-moe-50m": {
+        "name": "Maple728/TimeMoE-50M",
+        "model_type": "TSFM",
+        "model_family": "time-moe",
+        "model_size": 50,
+        "hosting": "UPB",
+        "architecture": "mixture-of-experts",
+        "pretraining_data": "Time-300B (300 billion time points)",
+        "publishing_date": "2024-09-16",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 4
+    },
+    "time-moe-200m": {
+        "name": "Maple728/TimeMoE-200M",
+        "model_type": "TSFM",
+        "model_family": "time-moe",
+        "model_size": 200,
+        "hosting": "UPB",
+        "architecture": "mixture-of-experts",
+        "pretraining_data": "Time-300B (300 billion time points)",
+        "publishing_date": "2024-09-16",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 4
+    },
+    "chronos-bolt-tiny": {
+        "name": "amazon/chronos-bolt-tiny",
+        "model_type": "TSFM",
+        "model_family": "chronos",
+        "model_size": 9,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "100 billion time series observations",
+        "publishing_date": "2024-11-26",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 5
+    },
+    "chronos-bolt-small": {
+        "name": "amazon/chronos-bolt-small",
+        "model_type": "TSFM",
+        "model_family": "chronos",
+        "model_size": 48,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "100 billion time series observations",
+        "publishing_date": "2024-11-26",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 5
+    },
+    "chronos-bolt-base": {
+        "name": "amazon/chronos-bolt-base",
+        "model_type": "TSFM",
+        "model_family": "chronos",
+        "model_size": 205,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "100 billion time series observations",
+        "publishing_date": "2024-11-26",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 5
+    },
+    "chronos-bolt-mini": {
+        "name": "amazon/chronos-bolt-mini",
+        "model_type": "TSFM",
+        "model_family": "chronos",
+        "model_size": 21,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "100 billion time series observations",
+        "publishing_date": "2024-11-26",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 5
+    },
+    "chronos-2": {
+        "name": "amazon/chronos-2",
+        "model_type": "TSFM",
+        "model_family": "chronos",
+        "model_size": 120,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "real-world and synthetic datasets",
+        "publishing_date": "2025-10-19",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 5
+    },
+    "moirai-small": {
+        "name": "Salesforce/moirai-1.1-R-small",
+        "model_type": "TSFM",
+        "model_family": "moirai",
+        "model_size": 14,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "LOTSA (27 billion observations)",
+        "publishing_date": "2024-06-18",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 6
+    },
+    "moirai-base-model": {
+        "name": "Salesforce/moirai-1.1-R-base",
+        "model_type": "TSFM",
+        "model_family": "moirai",
+        "model_size": 91,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "LOTSA (27 billion observations)",
+        "publishing_date": "2024-06-18",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 6
+    },
+    "moirai-large": {
+        "name": "Salesforce/moirai-1.1-R-large",
+        "model_type": "TSFM",
+        "model_family": "moirai",
+        "model_size": 311,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "LOTSA (27 billion observations)",
+        "publishing_date": "2024-06-18",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 6
+    },
+    "moirai-2-small": {
+        "name": "Salesforce/moirai-2.0-R-small",
+        "model_type": "TSFM",
+        "model_family": "moirai",
+        "model_size": 14,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "GIFT-Eval Pretrain subset + additional data",
+        "publishing_date": "2025-08-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 6
+    },
+    "moment-small": {
+        "name": "AutonLab/MOMENT-1-small",
+        "model_type": "TSFM",
+        "model_family": "moment",
+        "model_size": 40,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
+        "publishing_date": "2024-05-01",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "moment-base-model": {
+        "name": "AutonLab/MOMENT-1-base",
+        "model_type": "TSFM",
+        "model_family": "moment",
+        "model_size": 125,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
+        "publishing_date": "2024-05-01",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "moment-large": {
+        "name": "AutonLab/MOMENT-1-large",
+        "model_type": "TSFM",
+        "model_family": "moment",
+        "model_size": 385,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
+        "publishing_date": "2024-05-01",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "seasonal-naive": {
+        "name": "Statistical/Seasonal-Naive",
+        "model_type": "Baseline",
+        "model_family": "Statistical",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "rule-based",
+        "pretraining_data": null,
+        "publishing_date": null,
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
+    },
+    "naive": {
+        "name": "Statistical/Naive",
+        "model_type": "Baseline",
+        "model_family": "Statistical",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "rule-based",
+        "pretraining_data": null,
+        "publishing_date": null,
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
+    },
+    "simple-moving-average": {
+        "name": "Statistical/Simple-Moving-Average",
+        "model_type": "Baseline",
+        "model_family": "Statistical",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "rule-based",
+        "pretraining_data": null,
+        "publishing_date": null,
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
+    },
+    "seasonal-average": {
+        "name": "Statistical/Seasonal-Average",
+        "model_type": "Baseline",
+        "model_family": "Statistical",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "rule-based",
+        "pretraining_data": null,
+        "publishing_date": null,
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
+    },
+      "neuralforecast-nhits": {
+    "name": "NeuralForecast/NHITS",
+    "model_type": "Deep Learning",
+    "model_family": "Trained-From-Scratch",
+    "model_size": 0,
+    "hosting": "UPB",
+    "architecture": "MLP",
+    "pretraining_data": null,
+    "publishing_date": "2022-01-29",
+    "parameters": {
+      "additionalProp1": {}
+    },
+    "organization_id": 1
+  },
+  "neuralforecast-tsmixerx": {
+    "name": "NeuralForecast/TSMixerx",
+    "model_type": "Deep Learning",
+    "model_family": "Trained-From-Scratch",
+    "model_size": 0,
+    "hosting": "UPB",
+    "architecture": "MLP",
+    "pretraining_data": null,
+    "publishing_date": "2023-03-09",
+    "parameters": {
+      "additionalProp1": {}
+    },
+    "organization_id": 1
+  },
+  "neuralforecast-patchtst": {
+    "name": "NeuralForecast/PatchTST",
+    "model_type": "Deep Learning",
+    "model_family": "Trained-From-Scratch",
+    "model_size": 0,
+    "hosting": "UPB",
+    "architecture": "Transformer with patching",
+    "pretraining_data": null,
+    "publishing_date": "2022-11-26",
+    "parameters": {
+      "additionalProp1": {}
+    },
+    "organization_id": 1
+  },
+  "neuralforecast-tft": {
+    "name": "NeuralForecast/TFT",
+    "model_type": "Deep Learning",
+    "model_family": "NeuralForecast",
+    "model_size": 0,
+    "hosting": "UPB",
+    "architecture": "LSTM + attention",
+    "pretraining_data": null,
+    "publishing_date": "2019-12-18",
+    "parameters": {
+      "additionalProp1": {}
+    },
+    "organization_id": 1
+  },
+  "neuralforecast-tide": {
+    "name": "NeuralForecast/TiDE",
+    "model_type": "Deep Learning",
+    "model_family": "Trained-From-Scratch",
+    "model_size": 0,
+    "hosting": "UPB",
+    "architecture": "MLP encoder-decoder",
+    "pretraining_data": null,
+    "publishing_date": "2023-04-17",
+    "parameters": {
+      "additionalProp1": {}
+    },
+    "organization_id": 1
+  }
+}

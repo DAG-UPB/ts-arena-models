@@ -1,0 +1,35 @@
+services:
+  chronos-base: &chronos-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: chronos
+    build:
+      context: ../model-services/chronos
+      dockerfile: Dockerfile
+    profiles: ["chronos", "all-models"]
+
+  chronos-bolt-tiny:
+    <<: *chronos-base
+    environment:
+      - MODEL_ID=amazon/chronos-bolt-tiny
+
+  chronos-bolt-small:
+    <<: *chronos-base
+    environment:
+      - MODEL_ID=amazon/chronos-bolt-small
+
+  chronos-bolt-base:
+    <<: *chronos-base
+    environment:
+      - MODEL_ID=amazon/chronos-bolt-base
+
+  chronos-bolt-mini:
+    <<: *chronos-base
+    environment:
+      - MODEL_ID=amazon/chronos-bolt-mini
+
+  chronos-2:
+    <<: *chronos-base
+    environment:
+      - MODEL_ID=amazon/chronos-2

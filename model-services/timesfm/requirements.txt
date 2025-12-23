@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+torch
+python-dateutil
+timesfm[torch]
+numpy<2.0

@@ -1,0 +1,15 @@
+services:
+  gpu-model-base:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+    volumes:
+      - arena-db:/models
+    labels:
+      - managed.by=controller
+    networks:
+      - internal

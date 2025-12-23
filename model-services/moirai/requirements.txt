@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+uni2ts
+gluonts[torch]
+numpy
+pandas

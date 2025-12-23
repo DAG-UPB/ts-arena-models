@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+torch==2.7.0
+chronos-forecasting>=2.0
+pandas
+python-dateutil
+boto3

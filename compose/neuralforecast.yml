@@ -1,0 +1,35 @@
+services:
+  neuralforecast-base: &neuralforecast-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: neuralforecast
+    build:
+      context: ../model-services/neuralforecast
+      dockerfile: Dockerfile
+    profiles: ["neuralforecast", "all-models"]
+
+  neuralforecast-nhits:
+    <<: *neuralforecast-base
+    environment:
+      - MODEL_ID=nixtla/nhits
+
+  neuralforecast-tsmixerx:
+    <<: *neuralforecast-base
+    environment:
+      - MODEL_ID=nixtla/tsmixerx
+
+  neuralforecast-patchtst:
+    <<: *neuralforecast-base
+    environment:
+      - MODEL_ID=nixtla/patchtst
+
+  neuralforecast-tft:
+    <<: *neuralforecast-base
+    environment:
+      - MODEL_ID=nixtla/tft
+
+  neuralforecast-tide:
+    <<: *neuralforecast-base
+    environment:
+      - MODEL_ID=nixtla/tide

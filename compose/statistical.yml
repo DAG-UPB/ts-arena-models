@@ -1,0 +1,33 @@
+services:
+  naive-forecast:
+    image: naive-forecast
+    build:
+      context: ../model-services/naive-forecast
+      dockerfile: Dockerfile
+    profiles: ["statistical", "all-models"]
+    labels:
+      - managed.by=controller
+    networks:
+      - internal
+
+  simple-moving-average:
+    image: simple-moving-average
+    build:
+      context: ../model-services/simple-moving-average
+      dockerfile: Dockerfile
+    profiles: ["statistical", "all-models"]
+    labels:
+      - managed.by=controller
+    networks:
+      - internal
+
+  seasonal-average:
+    image: seasonal-average
+    build:
+      context: ../model-services/seasonal-average
+      dockerfile: Dockerfile
+    profiles: ["statistical", "all-models"]
+    labels:
+      - managed.by=controller
+    networks:
+      - internal

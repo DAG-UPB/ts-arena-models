@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pandas>=2.0
+torch>=2.2; platform_system != 'Darwin' or platform_machine != 'arm64'
+optuna>=3.5
+neuralforecast>=1.7.0
+scipy
