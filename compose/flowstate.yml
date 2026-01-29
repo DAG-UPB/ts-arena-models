@@ -1,0 +1,12 @@
+services:
+  flowstate:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: flowstate
+    build:
+      context: ../model-services/flowstate
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_ID=ibm-research/flowstate
+    profiles: ["flowstate", "all-models"]

@@ -1,5 +1,5 @@
 services:
-  moirai-base: &moirai-base
+  moirai-template: &moirai-template
     extends:
       file: base.yml
       service: gpu-model-base
@@ -10,22 +10,22 @@ services:
     profiles: ["moirai", "all-models"]
 
   moirai-small:
-    <<: *moirai-base
+    <<: *moirai-template
     environment:
       - MODEL_ID=Salesforce/moirai-1.1-R-small
 
   moirai-base-model:
-    <<: *moirai-base
+    <<: *moirai-template
     environment:
       - MODEL_ID=Salesforce/moirai-1.1-R-base
 
   moirai-large:
-    <<: *moirai-base
+    <<: *moirai-template
     environment:
       - MODEL_ID=Salesforce/moirai-1.1-R-large
 
   moirai-2-small:
-    <<: *moirai-base
+    <<: *moirai-template
     environment:
       - MODEL_ID=Salesforce/moirai-2.0-R-small
 

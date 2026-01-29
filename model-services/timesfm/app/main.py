@@ -54,12 +54,22 @@ def generate_future_timestamps(last_timestamp: datetime, horizon: int, freq: str
     return timestamps
 
 
-def create_forecast_items(timestamps: List[str], values: List[float]) -> List[ForecastItem]:
-    """Create ForecastItem list from timestamps and values"""
-    return [
-        ForecastItem(ts=ts, value=float(val), probabilistic_values={})
-        for ts, val in zip(timestamps, values)
-    ]
+def create_forecast_items(timestamps: List[str], values: List[float], quantiles_dict: Dict[str, List[float]] = None) -> List[ForecastItem]:
+    """Create ForecastItem list from timestamps, values, and optional quantiles"""
+    forecasts = []
+    for i, (ts, val) in enumerate(zip(timestamps, values)):
+        probabilistic_values = {}
+        if quantiles_dict:
+            for level, quantile_values in quantiles_dict.items():
+                if i < len(quantile_values):
+                    probabilistic_values[f"q_{level}"] = float(quantile_values[i])
+        
+        forecasts.append(ForecastItem(
+            ts=ts,
+            value=float(val),
+            probabilistic_values=probabilistic_values
+        ))
+    return forecasts
 
 
 app = FastAPI()
@@ -84,14 +94,16 @@ def predict(request: PredictionRequest):
             last_ts = datetime.fromisoformat(series[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
             last_timestamps.append(last_ts)
         
-        # Get predictions from model
-        predictions = model.predict(history_values, request.horizon)
+        # Get predictions from model (returns dict with 'forecasts' and 'quantiles')
+        result = model.predict(history_values, request.horizon)
         
         # Create ForecastItems for each series
         all_forecasts = []
-        for pred_values, last_ts in zip(predictions, last_timestamps):
+        for i, last_ts in enumerate(last_timestamps):
             future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-            forecasts = create_forecast_items(future_ts, pred_values)
+            pred_values = result['forecasts'][i]
+            quantiles_dict = result.get('quantiles', {}).get(i) if 'quantiles' in result else None
+            forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
             all_forecasts.append(forecasts)
         
         return {"prediction": all_forecasts}
@@ -101,11 +113,13 @@ def predict(request: PredictionRequest):
         last_ts = datetime.fromisoformat(request.history[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
         
         # Get prediction from model
-        prediction = model.predict(history_values, request.horizon)
+        result = model.predict(history_values, request.horizon)
         
         # Create ForecastItems
         future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-        forecasts = create_forecast_items(future_ts, prediction)
+        pred_values = result['forecasts']
+        quantiles_dict = result.get('quantiles')
+        forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
         
         return {"prediction": forecasts}
 
@@ -113,9 +127,9 @@ def predict(request: PredictionRequest):
 @app.get("/health")
 async def health_check():
     try:
-        prediction = model.predict([1,2,3,4,5], horizon=1)
+        result = model.predict([1,2,3,4,5], horizon=1)
         # Model loading check
-        if prediction is not None:
+        if result is not None and 'forecasts' in result:
             return {"status": "healthy", "model": "ready"}
         else:
             raise HTTPException(status_code=503, detail="Model not ready")

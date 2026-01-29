@@ -1,0 +1,50 @@
+services:
+  tinytimemixer-r2-template: &tinytimemixer-r2-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tinytimemixer
+    build:
+      context: ../model-services/tinytimemixer
+      dockerfile: Dockerfile
+    profiles: ["tinytimemixer", "all-models"]
+
+  tinytimemixer-r2-512-96:
+    <<: *tinytimemixer-r2-template
+    environment:
+      - MODEL_ID=ibm-granite/granite-timeseries-ttm-r2
+      - TTM_CONTEXT_LENGTH=512
+      - TTM_PREDICTION_LENGTH=96
+
+  tinytimemixer-r2-1024-96:
+    <<: *tinytimemixer-r2-template
+    environment:
+      - MODEL_ID=ibm-granite/granite-timeseries-ttm-r2
+      - TTM_CONTEXT_LENGTH=1024
+      - TTM_PREDICTION_LENGTH=96
+
+  tinytimemixer-r1-template: &tinytimemixer-r1-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tinytimemixer-r1
+    build:
+      context: ../model-services/tinytimemixer-r1
+      dockerfile: Dockerfile
+    profiles: ["tinytimemixer", "all-models"]
+
+  tinytimemixer-r1-512-96:
+    <<: *tinytimemixer-r1-template
+    environment:
+      - MODEL_ID=ibm-granite/granite-timeseries-ttm-r1
+      - TTM_R1_REVISION=main
+      - TTM_R1_CONTEXT_LENGTH=512
+      - TTM_R1_PREDICTION_LENGTH=96
+
+  tinytimemixer-r1-1024-96:
+    <<: *tinytimemixer-r1-template
+    environment:
+      - MODEL_ID=ibm-granite/granite-timeseries-ttm-r1
+      - TTM_R1_REVISION=1024_96_v1
+      - TTM_R1_CONTEXT_LENGTH=1024
+      - TTM_R1_PREDICTION_LENGTH=96

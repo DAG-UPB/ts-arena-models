@@ -21,7 +21,7 @@ class TimeMoEModel:
 
     def predict(self, history: Union[List[float], List[List[float]]], horizon: int) -> Union[List[float], List[List[float]]]:
         """
-        Makes a forecast using the Moirai-MoE model.
+        Makes a forecast using the TimeMoE model.
 
         Args:
             history: A list of historical values.
@@ -34,24 +34,48 @@ class TimeMoEModel:
         if is_single_series:
             history = [history]
 
-        # convert history to float and add batch dimension
-        history_np = np.array(history, dtype=np.float32)
-        # Convert history to tensor
-        seqs = torch.from_numpy(history_np).to(device)
+        # Check if all series have the same length
+        lengths = [len(h) for h in history]
+        all_same_length = len(set(lengths)) == 1
 
-        # normalize seqs
-        mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
-        std = std + 1e-8
-        normed_seqs = (seqs - mean) / std
+        if all_same_length:
+            # convert history to float and add batch dimension
+            history_np = np.array(history, dtype=np.float32)
+            # Convert history to tensor
+            seqs = torch.from_numpy(history_np).to(device)
 
-        # forecast
-        output = self.model.generate(normed_seqs, max_new_tokens=horizon, min_new_tokens=horizon, eos_token_id=None)
-        normed_predictions = output[:, -horizon:]
+            # normalize seqs
+            mean, std = seqs.mean(dim=-1, keepdim=True), seqs.std(dim=-1, keepdim=True)
+            std = std + 1e-8
+            normed_seqs = (seqs - mean) / std
 
-        # inverse normalize
-        predictions = normed_predictions * std + mean
+            # forecast
+            output = self.model.generate(normed_seqs, max_new_tokens=horizon, min_new_tokens=horizon, eos_token_id=None)
+            normed_predictions = output[:, -horizon:]
 
-        result = predictions.tolist()
+            # inverse normalize
+            predictions = normed_predictions * std + mean
+            result = predictions.tolist()
+        else:
+            # Process each series individually when lengths differ
+            result = []
+            for h in history:
+                h_np = np.array([h], dtype=np.float32)
+                seq = torch.from_numpy(h_np).to(device)
+
+                # normalize
+                mean, std = seq.mean(dim=-1, keepdim=True), seq.std(dim=-1, keepdim=True)
+                std = std + 1e-8
+                normed_seq = (seq - mean) / std
+
+                # forecast
+                output = self.model.generate(normed_seq, max_new_tokens=horizon, min_new_tokens=horizon, eos_token_id=None)
+                normed_pred = output[:, -horizon:]
+
+                # inverse normalize
+                pred = normed_pred * std + mean
+                result.append(pred[0].tolist())
+
         if is_single_series:
             return result[0]
         return result

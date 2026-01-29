@@ -1,0 +1,17 @@
+services:
+  etsfm-base: &etsfm-base
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: etsfm
+    build:
+      context: ../model-services/etsfm
+      dockerfile: Dockerfile
+    profiles: ["etsfm", "all-models"]
+
+  etsfm-tfs:
+    <<: *etsfm-base
+    environment:
+      - MODEL_ID=/models/checkpoint-25000
+    volumes:
+      - /home/kevin/scm/etsfm/output/small-stage1/run-old:/models

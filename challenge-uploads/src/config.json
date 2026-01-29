@@ -1,5 +1,4 @@
 {
-
     "timesfm-2.0-500m": {
         "name": "google/timesfm-2.0-500m-pytorch",
         "model_type": "TSFM",
@@ -294,74 +293,74 @@
         },
         "organization_id": 1
     },
-      "neuralforecast-nhits": {
-    "name": "NeuralForecast/NHITS",
-    "model_type": "Deep Learning",
-    "model_family": "Trained-From-Scratch",
-    "model_size": 0,
-    "hosting": "UPB",
-    "architecture": "MLP",
-    "pretraining_data": null,
-    "publishing_date": "2022-01-29",
-    "parameters": {
-      "additionalProp1": {}
+    "neuralforecast-nhits": {
+        "name": "NeuralForecast/NHITS",
+        "model_type": "Deep Learning",
+        "model_family": "Trained-From-Scratch",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "MLP",
+        "pretraining_data": null,
+        "publishing_date": "2022-01-29",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
     },
-    "organization_id": 1
-  },
-  "neuralforecast-tsmixerx": {
-    "name": "NeuralForecast/TSMixerx",
-    "model_type": "Deep Learning",
-    "model_family": "Trained-From-Scratch",
-    "model_size": 0,
-    "hosting": "UPB",
-    "architecture": "MLP",
-    "pretraining_data": null,
-    "publishing_date": "2023-03-09",
-    "parameters": {
-      "additionalProp1": {}
+    "neuralforecast-tsmixerx": {
+        "name": "NeuralForecast/TSMixerx",
+        "model_type": "Deep Learning",
+        "model_family": "Trained-From-Scratch",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "MLP",
+        "pretraining_data": null,
+        "publishing_date": "2023-03-09",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
     },
-    "organization_id": 1
-  },
-  "neuralforecast-patchtst": {
-    "name": "NeuralForecast/PatchTST",
-    "model_type": "Deep Learning",
-    "model_family": "Trained-From-Scratch",
-    "model_size": 0,
-    "hosting": "UPB",
-    "architecture": "Transformer with patching",
-    "pretraining_data": null,
-    "publishing_date": "2022-11-26",
-    "parameters": {
-      "additionalProp1": {}
+    "neuralforecast-patchtst": {
+        "name": "NeuralForecast/PatchTST",
+        "model_type": "Deep Learning",
+        "model_family": "Trained-From-Scratch",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "Transformer with patching",
+        "pretraining_data": null,
+        "publishing_date": "2022-11-26",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
     },
-    "organization_id": 1
-  },
-  "neuralforecast-tft": {
-    "name": "NeuralForecast/TFT",
-    "model_type": "Deep Learning",
-    "model_family": "NeuralForecast",
-    "model_size": 0,
-    "hosting": "UPB",
-    "architecture": "LSTM + attention",
-    "pretraining_data": null,
-    "publishing_date": "2019-12-18",
-    "parameters": {
-      "additionalProp1": {}
+    "neuralforecast-tft": {
+        "name": "NeuralForecast/TFT",
+        "model_type": "Deep Learning",
+        "model_family": "NeuralForecast",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "LSTM + attention",
+        "pretraining_data": null,
+        "publishing_date": "2019-12-18",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
     },
-    "organization_id": 1
-  },
-  "neuralforecast-tide": {
-    "name": "NeuralForecast/TiDE",
-    "model_type": "Deep Learning",
-    "model_family": "Trained-From-Scratch",
-    "model_size": 0,
-    "hosting": "UPB",
-    "architecture": "MLP encoder-decoder",
-    "pretraining_data": null,
-    "publishing_date": "2023-04-17",
-    "parameters": {
-      "additionalProp1": {}
-    },
-    "organization_id": 1
-  }
+    "neuralforecast-tide": {
+        "name": "NeuralForecast/TiDE",
+        "model_type": "Deep Learning",
+        "model_family": "Trained-From-Scratch",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "MLP encoder-decoder",
+        "pretraining_data": null,
+        "publishing_date": "2023-04-17",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 1
+    }
 }

@@ -26,6 +26,21 @@ services:
     build:
       context: ../model-services/seasonal-average
       dockerfile: Dockerfile
+    environment:
+      - SEASONAL_SEASONS=3
+    profiles: ["statistical", "all-models"]
+    labels:
+      - managed.by=controller
+    networks:
+      - internal
+
+  seasonal-naive:
+    image: seasonal-naive
+    build:
+      context: ../model-services/seasonal-average
+      dockerfile: Dockerfile
+    environment:
+      - SEASONAL_SEASONS=1
     profiles: ["statistical", "all-models"]
     labels:
       - managed.by=controller

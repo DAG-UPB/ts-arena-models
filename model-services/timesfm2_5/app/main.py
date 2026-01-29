@@ -119,26 +119,27 @@ def predict(request: PredictionRequest):
                     
                     for h in range(len(future_ts)):
                         q_values = series_quantiles[h]
-                        # Map to quantile names: mean, q10, q20, ..., q90                        
+                        # Map to quantile names: q_0.1, q_0.2, ..., q_0.9
                         q_dict = {
-                            "mean": float(q_values[0]),
-                            "q10": float(q_values[1]),
-                            "q20": float(q_values[2]),
-                            "q30": float(q_values[3]),
-                            "q40": float(q_values[4]),
-                            "q50": float(q_values[5]),
-                            "q60": float(q_values[6]),
-                            "q70": float(q_values[7]),
-                            "q80": float(q_values[8]),
-                            "q90": float(q_values[9])
+                            "q_0.1": float(q_values[1]),
+                            "q_0.2": float(q_values[2]),
+                            "q_0.3": float(q_values[3]),
+                            "q_0.4": float(q_values[4]),
+                            "q_0.5": float(q_values[5]),
+                            "q_0.6": float(q_values[6]),
+                            "q_0.7": float(q_values[7]),
+                            "q_0.8": float(q_values[8]),
+                            "q_0.9": float(q_values[9])
                         }
                         quantiles_dict_list.append(q_dict)
                 else:
                     quantiles_dict_list = [{}] * len(future_ts)
 
                 forecasts = []
-                for ts, val, q_dict in zip(future_ts, pred_values, quantiles_dict_list):
-                    forecasts.append(ForecastItem(ts=ts, value=float(val), probabilistic_values=q_dict))
+                for h, (ts, q_dict) in enumerate(zip(future_ts, quantiles_dict_list)):
+                    # Use q_0.5 (median) as point forecast for consistency
+                    point_val = q_dict.get("q_0.5", float(pred_values[h])) if q_dict else float(pred_values[h])
+                    forecasts.append(ForecastItem(ts=ts, value=point_val, probabilistic_values=q_dict))
                 
                 all_forecasts.append(forecasts)
             
@@ -160,24 +161,25 @@ def predict(request: PredictionRequest):
                  for h in range(len(future_ts)):
                     q_values = quantile_prediction[h]
                     q_dict = {
-                        "mean": float(q_values[0]),
-                        "q10": float(q_values[1]),
-                        "q20": float(q_values[2]),
-                        "q30": float(q_values[3]),
-                        "q40": float(q_values[4]),
-                        "q50": float(q_values[5]),
-                        "q60": float(q_values[6]),
-                        "q70": float(q_values[7]),
-                        "q80": float(q_values[8]),
-                        "q90": float(q_values[9])
+                        "q_0.1": float(q_values[1]),
+                        "q_0.2": float(q_values[2]),
+                        "q_0.3": float(q_values[3]),
+                        "q_0.4": float(q_values[4]),
+                        "q_0.5": float(q_values[5]),
+                        "q_0.6": float(q_values[6]),
+                        "q_0.7": float(q_values[7]),
+                        "q_0.8": float(q_values[8]),
+                        "q_0.9": float(q_values[9])
                     }
                     quantiles_dict_list.append(q_dict)
             else:
                 quantiles_dict_list = [{}] * len(future_ts)
 
             forecasts = []
-            for ts, val, q_dict in zip(future_ts, point_prediction, quantiles_dict_list):
-                forecasts.append(ForecastItem(ts=ts, value=float(val), probabilistic_values=q_dict))
+            for h, (ts, q_dict) in enumerate(zip(future_ts, quantiles_dict_list)):
+                # Use q_0.5 (median) as point forecast for consistency
+                point_val = q_dict.get("q_0.5", float(point_prediction[h])) if q_dict else float(point_prediction[h])
+                forecasts.append(ForecastItem(ts=ts, value=point_val, probabilistic_values=q_dict))
             
             return {"prediction": forecasts}
     except Exception as e:

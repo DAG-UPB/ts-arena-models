@@ -32,7 +32,7 @@ class ChronosModel:
             freq: str = "h",
             past_covariates: Union[None, pd.DataFrame] = None,
             future_covariates: Union[None, pd.DataFrame] = None,
-            quantile_levels: List[float] = [0.1, 0.5, 0.9]
+            quantile_levels: List[float] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         ) -> Dict[str, Any]:
         """
         Run forecasting with Chronos model.
@@ -74,14 +74,22 @@ class ChronosModel:
                 "timestamp": index,
                 "target": ts_values
             })
+            
+            # Fill gaps in time series
+            if not df_seq.empty:
+                min_ts = df_seq["timestamp"].min()
+                max_ts = df_seq["timestamp"].max()
+                full_range = pd.date_range(start=min_ts, end=max_ts, freq=freq)
+                df_full = pd.DataFrame({"timestamp": full_range})
+                df_seq = pd.merge(df_full, df_seq, on="timestamp", how="left")
+                df_seq["id"] = f"series_{idx}"
+                
             dfs.append(df_seq)
         
         df = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
         
         
-        # Für Chronos-2 mit DataFrames
         if isinstance(self.pipeline, Chronos2Pipeline):
-            # Annahme: data, past_covariates, future_covariates sind DataFrames mit passenden Spalten
             pred_df = self.pipeline.predict_df(
                 df,
                 future_df=future_covariates,
@@ -123,7 +131,6 @@ class ChronosModel:
                 return {'forecasts': series_pred, 'quantiles': quantiles_dict}
 
         else:
-            # Chronos-Bolt: Input als Tensor
             # Extract just the values for the tensor
             values_list = []
             for series_data in data_as_batch:
@@ -153,32 +160,40 @@ class ChronosModel:
                 quantile_levels=quantile_levels
             )
             
-            # mean.shape is (batch, horizon)
-            result = mean.tolist()
+            # Find index of 0.5 quantile for median
+            median_idx = quantile_levels.index(0.5) if 0.5 in quantile_levels else None
             
             if is_batch:
                 # Multiple series
-                forecasts_list = result  # Already a list of lists
-                
-                # Extract quantiles for each series
+                forecasts_list = []
                 quantiles_dict = {}
-                for i in range(len(result)):
+                
+                for i in range(quantiles.shape[0]):
                     series_quantiles = {}
                     for j, level in enumerate(quantile_levels):
                         # quantiles shape is (batch, horizon, num_quantiles)
                         series_quantiles[str(level)] = quantiles[i, :, j].tolist()
                     quantiles_dict[i] = series_quantiles
+                    
+                    # Use median (q_0.5) as point forecast for consistency
+                    if median_idx is not None:
+                        forecasts_list.append(quantiles[i, :, median_idx].tolist())
+                    else:
+                        forecasts_list.append(mean[i].tolist())
                 
                 return {'forecasts': forecasts_list, 'quantiles': quantiles_dict}
             else:
                 # Single series
-                forecasts = result[0]
-                
-                # Extract quantiles
                 quantiles_dict = {}
                 for j, level in enumerate(quantile_levels):
                     # quantiles shape is (batch, horizon, num_quantiles)
                     quantiles_dict[str(level)] = quantiles[0, :, j].tolist()
+                
+                # Use median (q_0.5) as point forecast for consistency
+                if median_idx is not None:
+                    forecasts = quantiles[0, :, median_idx].tolist()
+                else:
+                    forecasts = mean[0].tolist()
                 
                 return {'forecasts': forecasts, 'quantiles': quantiles_dict}
 

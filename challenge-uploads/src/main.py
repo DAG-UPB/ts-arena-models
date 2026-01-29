@@ -3,6 +3,8 @@ import time
 import logging
 import json
 import re
+import csv
+import traceback
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -27,6 +29,31 @@ API_KEY = os.environ.get("API_UPLOAD_KEY", "default_api_key")
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 USER_ID = os.environ.get("USER_ID")
 CONFIG_FILE = os.environ.get("CONFIG_FILE", "config.json")
+PARTICIPATION_LOG_FILE = os.environ.get("PARTICIPATION_LOG_FILE", "participation_log.csv")
+
+def log_participation(round_id: str, challenge_name: str, model_container: str, 
+                      api_model_name: str, status: str, message: str = ""):
+    """Log participation details to CSV file"""
+    file_exists = os.path.exists(PARTICIPATION_LOG_FILE)
+    
+    try:
+        with open(PARTICIPATION_LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["Timestamp", "Challenge ID", "Challenge Name", "Model Container", 
+                                 "API Model Name", "Status", "Message"])
+            
+            writer.writerow([
+                datetime.now().isoformat(),
+                round_id,
+                challenge_name,
+                model_container,
+                api_model_name,
+                status,
+                message
+            ])
+    except Exception as e:
+        logger.error(f"Error writing to participation log: {e}")
 
 # --- HTTP Helper Functions ---
 def http_get(path: str, with_auth: bool = True) -> requests.Response:
@@ -123,10 +150,11 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
     
     for container_name, conf_data in config.items():
         conf_model_name = conf_data.get("name")
+        logger.info(f"Resolving model for container '{container_name}': {conf_model_name}")
         if not conf_model_name:
             continue
             
-        if conf_model_name in reg_lookup:
+        if container_name in reg_lookup:
             # Match found
             resolved.append((container_name, conf_model_name))
             logger.info(f"Model matched: Container '{container_name}' -> API Name '{conf_model_name}'")
@@ -138,65 +166,43 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
 
 # --- API Utils ---
 def get_all_challenges() -> List[Dict[str, Any]]:
-    """Fetch all available challenges"""
+    """Fetch all available challenges (registration phase)"""
     try:
-        resp = http_get("/api/v1/challenge/", with_auth=True)
+        resp = http_get("/api/v1/challenge/rounds?status=registration", with_auth=True)
         return resp.json() or []
     except Exception as e:
         logger.error(f"Error fetching challenges: {e}")
         return []
 
 
-def is_registration_active(challenge: Dict[str, Any]) -> bool:
-    """Check if registration for a challenge is active"""
+
+
+
+
+def get_context_data(round_id: str) -> List[Dict[str, Any]]:
+    """Fetch context data for a challenge round"""
     try:
-        reg_start_str = challenge.get("registration_start")
-        reg_end_str = challenge.get("registration_end")
-        
-        if not reg_start_str or not reg_end_str:
-            return False
-        
-        now = datetime.now()
-        reg_start = datetime.fromisoformat(reg_start_str.replace('Z', '+00:00'))
-        reg_end = datetime.fromisoformat(reg_end_str.replace('Z', '+00:00'))
-        
-        # Remove timezone information for comparison
-        reg_start = reg_start.replace(tzinfo=None)
-        reg_end = reg_end.replace(tzinfo=None)
-        
-        return reg_start <= now <= reg_end
-    except Exception as e:
-        logger.warning(f"Error checking registration time: {e}")
-        return False
-
-
-def get_challenge_details(challenge_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch details for a challenge"""
-    try:
-        # Challenge details might require auth - try with auth first
-        resp = http_get(f"/api/v1/challenge/{challenge_id}", with_auth=True)
-        return resp.json()
-    except Exception as e:
-        logger.error(f"Error fetching challenge details for {challenge_id}: {e}")
-        return None
-
-
-def get_context_data(challenge_id: str) -> List[Dict[str, Any]]:
-    """Fetch context data for a challenge"""
-    try:
-        resp = http_get(f"/api/v1/challenge/{challenge_id}/context-data", with_auth=True)
+        resp = http_get(f"/api/v1/challenge/rounds/{round_id}/context-data", with_auth=True)
         return resp.json() or []
     except Exception as e:
-        logger.error(f"Error fetching context data for challenge {challenge_id}: {e}")
+        logger.error(f"Error fetching context data for round {round_id}: {e}")
         return []
 
 
 # --- Frequency Parsing ---
 def parse_frequency(frequency_str: str) -> timedelta:
-    """Parse frequency string to timedelta (e.g. '15 minutes' -> timedelta(minutes=15))"""
-    frequency_str = (frequency_str or "").strip().lower()
+    """Parse frequency string to timedelta (supports ISO 8601 duration)"""
+    frequency_str = (frequency_str or "").strip()
     
-    # Match patterns like "15 minutes", "1 hour", "30 mins", etc.
+    # Try ISO 8601 duration first (e.g. 'PT1H', 'PT15M')
+    if frequency_str.startswith('P'):
+        try:
+            return isodate.parse_duration(frequency_str)
+        except Exception as e:
+            logger.warning(f"Error parsing ISO frequency '{frequency_str}': {e}")
+    
+    # Legacy / Human-readable formats
+    lower_str = frequency_str.lower()
     patterns = [
         (r"(\d+)\s*(?:minute|minutes|min|mins)", lambda m: timedelta(minutes=int(m.group(1)))),
         (r"(\d+)\s*(?:hour|hours|hr|hrs|h)", lambda m: timedelta(hours=int(m.group(1)))),
@@ -205,7 +211,7 @@ def parse_frequency(frequency_str: str) -> timedelta:
     ]
     
     for pattern, converter in patterns:
-        match = re.match(pattern, frequency_str)
+        match = re.match(pattern, lower_str)
         if match:
             return converter(match)
     
@@ -305,7 +311,8 @@ def predict_with_model(model_name: str, histories: List[List[Dict[str, Any]]], h
         return preds
     except Exception as e:
         logger.error(f"Error during prediction with model {model_name}: {e}")
-        return None
+        # Re-raise to be caught by the main loop for logging
+        raise
 
 
 # --- Forecast Formatting ---
@@ -341,43 +348,41 @@ def format_forecasts(
 
 
 # --- Upload ---
-def upload_forecasts(challenge_id: int, model_name: str, forecasts: List[Dict[str, Any]]):
-    """Upload forecasts for a challenge"""
+def upload_forecasts(round_id: int, model_name: str, forecasts: List[Dict[str, Any]]):
+    """Upload forecasts for a challenge round"""
     payload = {
-        "challenge_id": challenge_id,
+        "round_id": round_id,
         "model_name": model_name,
         "forecasts": forecasts
     }
     
     try:
         http_post("/api/v1/forecasts/upload", json_data=payload)
-        logger.info(f"✓ Upload successful for challenge {challenge_id}, model {model_name}: {len(forecasts)} series")
+        logger.info(f"✓ Upload successful for round {round_id}, model {model_name}: {len(forecasts)} series")
     except Exception as e:
-        logger.error(f"✗ Error uploading for challenge {challenge_id}, model {model_name}: {e}")
+        logger.error(f"✗ Error uploading for round {round_id}, model {model_name}: {e}")
+        raise
 
 
 # --- Main ---
 def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]]):
-    """Process a single challenge"""
-    challenge_id = challenge.get("id")
+    """Process a single challenge round"""
+    round_id = challenge.get("id")
     challenge_name = challenge.get("name", "Unknown")
     
-    if not challenge_id:
+    if not round_id:
         logger.warning("Skipped challenge without ID")
         return
     
-    logger.info(f"Processing challenge {challenge_id}: {challenge_name}")
+    logger.info(f"Processing challenge round {round_id}: {challenge_name}")
     
-    # Fetch challenge details for frequency and horizon
-    details = get_challenge_details(str(challenge_id))
-    if not details:
-        logger.warning(f"Could not fetch details for challenge {challenge_id}")
+    # Extract frequency and horizon (expected in the rounds response)
+    frequency_str = challenge.get("frequency")
+    horizon_str = challenge.get("horizon")
+    
+    if not frequency_str or not horizon_str:
+        logger.warning(f"Challenge round {round_id} missing frequency or horizon")
         return
-    
-    # Extract frequency and horizon
-    prep_params = details.get("preparation_params", {})
-    frequency_str = prep_params.get("frequency", "1 hour")
-    horizon_str = details.get("horizon", "PT1H")
     
     frequency_delta = parse_frequency(frequency_str)
     horizon_steps = parse_horizon(horizon_str, frequency_delta)
@@ -386,15 +391,15 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     logger.info(f"  Horizon: {horizon_str} -> {horizon_steps} steps")
     
     # Fetch context data
-    context_data = get_context_data(str(challenge_id))
+    context_data = get_context_data(str(round_id))
     if not context_data:
-        logger.warning(f"No context data for challenge {challenge_id}")
+        logger.warning(f"No context data for round {round_id}")
         return
     
     # Extract history in HistoryItem format
     histories, series_names, max_timestamps = extract_history_from_context(context_data)
     if not histories:
-        logger.warning(f"No usable history data for challenge {challenge_id}")
+        logger.warning(f"No usable history data for round {round_id}")
         return
     
     logger.info(f"  {len(histories)} series found")
@@ -402,25 +407,49 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     # Convert frequency to model format
     freq_mapping = {
         "1 minute": "1min", "15 minutes": "15min", "30 minutes": "30min",
-        "1 hour": "h", "1 day": "D", "1 week": "W", "1 month": "M"
+        "1 hour": "h", "1 day": "D", "1 week": "W", "1 month": "M",
+        "PT1M": "1min", "PT15M": "15min", "PT30M": "30min",
+        "PT1H": "h", "P1D": "D", "P1W": "W", "P1M": "M"
     }
-    model_freq = freq_mapping.get(frequency_str.lower())
+    model_freq = freq_mapping.get(frequency_str) or freq_mapping.get(frequency_str.lower())
+    
+    if not model_freq:
+        # Generic ISO duration mapping
+        if frequency_str.startswith('PT'):
+            if 'H' in frequency_str: model_freq = 'h'
+            elif 'M' in frequency_str: model_freq = '15min' # default min
+        elif frequency_str.startswith('P'):
+            if 'D' in frequency_str: model_freq = 'D'
+            elif 'W' in frequency_str: model_freq = 'W'
+            elif 'M' in frequency_str: model_freq = 'M'
+        
+        if not model_freq:
+            logger.warning(f"Could not map frequency '{frequency_str}' to model format, using 'h'")
+            model_freq = 'h'
     
     # Process for each model in active_models
     for container_name, api_model_name in active_models:
         logger.info(f"  Creating predictions with container {container_name} for model {api_model_name}")
         
-        # Predict uses container_name
-        predictions = predict_with_model(container_name, histories, horizon_steps, model_freq)
-        if not predictions:
-            logger.warning(f"  No predictions for container {container_name}")
-            continue
-        
-        # Format forecasts
-        forecasts = format_forecasts(predictions, series_names, max_timestamps, frequency_delta)
-        
-        # Upload uses api_model_name
-        upload_forecasts(int(challenge_id), api_model_name, forecasts)
+        try:
+            # Predict uses container_name
+            predictions = predict_with_model(container_name, histories, horizon_steps, model_freq)
+            if not predictions:
+                logger.warning(f"  No predictions for container {container_name}")
+                log_participation(str(round_id), challenge_name, container_name, api_model_name, "FAILURE", "Prediction returned None or invalid format")
+                continue
+            
+            # Format forecasts
+            forecasts = format_forecasts(predictions, series_names, max_timestamps, frequency_delta)
+            
+            # Upload uses api_model_name
+            upload_forecasts(int(round_id), container_name, forecasts)
+            log_participation(str(round_id), challenge_name, container_name, api_model_name, "SUCCESS", f"Uploaded {len(forecasts)} series")
+            
+        except Exception as e:
+            error_details = traceback.format_exc()
+            logger.error(f"Error processing model {container_name}: {e}")
+            log_participation(str(round_id), challenge_name, container_name, api_model_name, "FAILURE", f"{str(e)}\n{error_details}")
 
 
 def main_loop():
@@ -433,6 +462,7 @@ def main_loop():
     # Model initialization
     config = load_config()
     registered_models = fetch_registered_models()
+    logger.info(f"Registered models: {registered_models}")
     active_models = resolve_models(config, registered_models)
     
     if not active_models:
@@ -451,23 +481,19 @@ def main_loop():
             logger.info(f"Found challenges: {len(challenges)}")
             
             for challenge in challenges:
-                challenge_id = challenge.get("id")
-                
-                # Check if registration is active
-                if not is_registration_active(challenge):
-                    continue
+                round_id = challenge.get("id")
                 
                 # Check if already processed
-                if challenge_id in processed_challenges:
-                    logger.debug(f"Challenge {challenge_id} already processed, skipping")
+                if round_id in processed_challenges:
+                    logger.debug(f"Round {round_id} already processed, skipping")
                     continue
                 
                 # Process challenge
                 try:
                     process_challenge(challenge, active_models)
-                    processed_challenges.add(challenge_id)
+                    processed_challenges.add(round_id)
                 except Exception as e:
-                    logger.error(f"Error processing challenge {challenge_id}: {e}")
+                    logger.error(f"Error processing round {round_id}: {e}")
             
             # Wait for next check
             logger.info(f"Waiting {CHECK_INTERVAL}s for next check...")
@@ -498,8 +524,7 @@ def main_once():
     logger.info(f"Found challenges: {len(challenges)}")
     
     for challenge in challenges:
-        if is_registration_active(challenge):
-            process_challenge(challenge, active_models)
+        process_challenge(challenge, active_models)
 
 
 if __name__ == "__main__":

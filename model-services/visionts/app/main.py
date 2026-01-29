@@ -5,12 +5,9 @@ from pydantic import BaseModel
 from typing import List, Union, Dict, Optional
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from .model import VisionTSModel
 import logging
-import traceback
-from .model import MoiraiModel
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class HistoryItem(BaseModel):
@@ -78,7 +75,7 @@ def create_forecast_items(timestamps: List[str], values: List[float], quantiles_
 
 
 app = FastAPI()
-model = MoiraiModel()
+model = VisionTSModel()
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -90,59 +87,66 @@ def predict(request: PredictionRequest):
     is_batch = isinstance(request.history[0], list)
     
     if is_batch:
-        # Prepare data for model
-        model_input = [[{"ts": item.ts, "value": item.value} for item in series] for series in request.history]
-        
+        data = []
         last_timestamps = []
         for series in request.history:
+            series_data = [{"ts": item.ts, "value": item.value} for item in series]
+            data.append(series_data)
             # Parse last timestamp
             last_ts = datetime.fromisoformat(series[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
             last_timestamps.append(last_ts)
         
-        # Get predictions from model (returns dict with 'forecasts' and 'quantiles')
-        result = model.predict(model_input, request.horizon, freq)
+        # Get predictions from model
+        result = model.predict(data, request.horizon, freq)
+        predictions = result['forecasts']
+        quantiles = result.get('quantiles', None)
+        
+        # Ensure predictions is a list of lists
+        if not isinstance(predictions[0], list):
+            predictions = [predictions]
         
         # Create ForecastItems for each series
         all_forecasts = []
-        for i, (last_ts) in enumerate(last_timestamps):
+        for idx, (pred_values, last_ts) in enumerate(zip(predictions, last_timestamps)):
             future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-            pred_values = result['forecasts'][i]
-            quantiles_dict = result.get('quantiles', {}).get(i) if 'quantiles' in result else None
-            forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
+            q_dict = quantiles[idx] if quantiles and idx < len(quantiles) else None
+            forecasts = create_forecast_items(future_ts, pred_values, q_dict)
             all_forecasts.append(forecasts)
         
         return {"prediction": all_forecasts}
     else:
         # Single series
-        model_input = [{"ts": item.ts, "value": item.value} for item in request.history]
+        data = [{"ts": item.ts, "value": item.value} for item in request.history]
         last_ts = datetime.fromisoformat(request.history[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
         
         # Get prediction from model
-        result = model.predict(model_input, request.horizon, freq)
+        result = model.predict(data, request.horizon, freq)
+        prediction = result['forecasts']
+        quantiles = result.get('quantiles', None)
+        
+        # Ensure prediction is a list
+        if not isinstance(prediction, list):
+            prediction = [prediction]
         
         # Create ForecastItems
         future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-        pred_values = result['forecasts']
-        quantiles_dict = result.get('quantiles')
-        forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
+        forecasts = create_forecast_items(future_ts, prediction, quantiles)
         
         return {"prediction": forecasts}
 
 
 @app.get("/health")
-async def health_check():
+def health():
     try:
-        # Create dummy timestamps
+        # Create dummy data with timestamps
         now = datetime.now()
-        data = [{"ts": (now - timedelta(hours=i)).isoformat(), "value": float(i)} for i in range(5, 0, -1)]
-        prediction = model.predict(data, horizon=1, frequency="h")
-        # Model loading check
-        if prediction is not None:
+        data = [{"ts": (now - timedelta(hours=i)).isoformat() + "Z", "value": float(i)} for i in range(5, 0, -1)]
+        result = model.predict(data, horizon=1, freq="h")
+        if result is not None and 'forecasts' in result:
             return {"status": "healthy", "model": "ready"}
         else:
-            logger.error("Health check failed: Model returned None")
+            logger.error("Model returned None or invalid result")
             raise HTTPException(status_code=503, detail="Model not ready")
     except Exception as e:
-        logger.error(f"Health check failed with exception: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}")

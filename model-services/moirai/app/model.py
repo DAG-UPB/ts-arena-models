@@ -3,6 +3,7 @@ from typing import List, Union, cast, Dict, Any
 
 import torch
 import pandas as pd
+import numpy as np
 from gluonts.dataset.pandas import PandasDataset
 
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
@@ -139,7 +140,8 @@ class MoiraiModel:
         data: Union[List[Dict[str, Any]], List[List[Dict[str, Any]]]],
         horizon: int,
         frequency: str = "h",
-    ) -> Union[List[float], List[List[float]]]:
+        quantile_levels: List[float] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    ) -> Dict[str, Any]:
         """
         Run forecasting with the chosen Moirai model.
 
@@ -153,15 +155,14 @@ class MoiraiModel:
                 Number of forecast steps (prediction_length).
             frequency:
                 Pandas/GluonTS frequency string, e.g. "h", "D", "1min".
+            quantile_levels:
+                List of quantile levels for probabilistic forecasting (default: 0.1 to 0.9).
 
         Returns:
-            If a single time series is passed:
-                List[float] of length `horizon`.
-            If a batch is passed:
-                List[List[float]] with one forecast per input series.
+            Dictionary with 'forecasts' (point forecasts) and 'quantiles' (quantile forecasts).
         """
         if not data:
-            return []
+            return {'forecasts': [], 'quantiles': {}}
 
         # Detect single-series vs. batch input
         is_batch = isinstance(data[0], list)
@@ -172,6 +173,7 @@ class MoiraiModel:
             data_as_batch = [cast(List[Dict[str, Any]], data)]
 
         all_forecasts = []
+        all_quantiles = []
 
         # Process each series individually to handle varying lengths and avoid padding artifacts
         for series_data in data_as_batch:
@@ -208,13 +210,39 @@ class MoiraiModel:
             predictor = model.create_predictor(batch_size=1)
             forecasts = list(predictor.predict(ds))
             
-            if forecasts:
-                all_forecasts.append(forecasts[0].mean.tolist())
+            forecast_obj = forecasts[0]
+            
+            if self.family == "moirai2":
+                quantile_dict = {}
+                for q in quantile_levels:
+                    q_key = str(q)
+                    if q_key in forecast_obj.forecast_keys:
+                        q_values = forecast_obj.quantile(q_key).tolist()
+                    else:
+                        # Interpolate if requested quantile not in native set
+                        q_values = forecast_obj.quantile(q).tolist()
+                    quantile_dict[q_key] = q_values
+                all_quantiles.append(quantile_dict)
+                all_forecasts.append(quantile_dict['0.5'])
             else:
-                all_forecasts.append([])
+                samples = np.array(forecast_obj.samples)
+                quantile_dict = {}
+                for q in quantile_levels:
+                    q_values = np.quantile(samples, q, axis=0).tolist()
+                    quantile_dict[str(q)] = q_values
+                all_quantiles.append(quantile_dict)
+                all_forecasts.append(quantile_dict['0.5'])
 
-        # Return a flat list for single-series input
+        # Return structured output
         if not is_batch:
-            return all_forecasts[0]
+            return {
+                'forecasts': all_forecasts[0],
+                'quantiles': all_quantiles[0]
+            }
 
-        return all_forecasts
+        # For batch, format quantiles as dict with series index
+        quantiles_by_series = {i: all_quantiles[i] for i in range(len(all_quantiles))}
+        return {
+            'forecasts': all_forecasts,
+            'quantiles': quantiles_by_series
+        }

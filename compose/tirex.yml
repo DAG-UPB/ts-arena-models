@@ -1,0 +1,12 @@
+services:
+  tirex:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tirex
+    build:
+      context: ../model-services/tirex
+      dockerfile: Dockerfile
+    profiles: ["tirex", "all-models"]
+    environment:
+      - MODEL_ID=NX-AI/TiRex

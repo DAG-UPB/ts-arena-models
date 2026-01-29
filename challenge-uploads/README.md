@@ -8,8 +8,8 @@ The service performs the following steps:
 
 1. **Challenge Polling**: Regularly polls all available challenges via `GET /api/v1/challenge/`
 2. **Registration Check**: Checks for each challenge if the current time is within `registration_start` and `registration_end`
-3. **Challenge Details**: Fetches challenge details (`GET /api/v1/challenge/{challenge_id}`) to determine frequency and horizon
-4. **Context Data**: Loads historical data via `GET /api/v1/challenge/{challenge_id}/context-data` with API key
+3. **Challenge Details**: Fetches challenge details (`GET /api/v1/challenge/{round_id}`) to determine frequency and horizon
+4. **Context Data**: Loads historical data via `GET /api/v1/challenge/{round_id}/context-data` with API key
 5. **Prediction**: Sends history data to the Master Controller (`POST http://master-controller:8456/predict`) for each configured model
 6. **Formatting**: Formats predictions according to API specification with correct timestamps based on frequency
 7. **Upload**: Uploads forecasts via `POST /api/v1/forecasts/upload`

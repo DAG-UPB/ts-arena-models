@@ -5,12 +5,9 @@ from pydantic import BaseModel
 from typing import List, Union, Dict, Optional
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from .model import TiRexModel
 import logging
-import traceback
-from .model import MoiraiModel
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class HistoryItem(BaseModel):
@@ -78,36 +75,47 @@ def create_forecast_items(timestamps: List[str], values: List[float], quantiles_
 
 
 app = FastAPI()
-model = MoiraiModel()
+model = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    global model
+    logger.info("Loading TiRex model...")
+    model = TiRexModel()
+    logger.info("TiRex model loaded successfully")
 
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
     if not request.history:
         raise HTTPException(status_code=400, detail="History cannot be empty")
-    
+
     freq = request.freq or "h"
     is_batch = isinstance(request.history[0], list)
     
     if is_batch:
-        # Prepare data for model
-        model_input = [[{"ts": item.ts, "value": item.value} for item in series] for series in request.history]
-        
+        # Prepare data with timestamps for model
+        model_input = []
         last_timestamps = []
         for series in request.history:
-            # Parse last timestamp
+            series_data = [{"ts": item.ts, "value": item.value} for item in series]
+            model_input.append(series_data)
             last_ts = datetime.fromisoformat(series[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
             last_timestamps.append(last_ts)
         
-        # Get predictions from model (returns dict with 'forecasts' and 'quantiles')
+        # Get predictions from model
         result = model.predict(model_input, request.horizon, freq)
         
         # Create ForecastItems for each series
         all_forecasts = []
-        for i, (last_ts) in enumerate(last_timestamps):
+        for i, last_ts in enumerate(last_timestamps):
             future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
             pred_values = result['forecasts'][i]
-            quantiles_dict = result.get('quantiles', {}).get(i) if 'quantiles' in result else None
+            quantiles_dict = result.get('quantiles', [{}] * len(last_timestamps))[i] if 'quantiles' in result else None
             forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
             all_forecasts.append(forecasts)
         
@@ -128,21 +136,18 @@ def predict(request: PredictionRequest):
         
         return {"prediction": forecasts}
 
-
 @app.get("/health")
 async def health_check():
     try:
-        # Create dummy timestamps
+        # Create dummy data with timestamps
         now = datetime.now()
-        data = [{"ts": (now - timedelta(hours=i)).isoformat(), "value": float(i)} for i in range(5, 0, -1)]
-        prediction = model.predict(data, horizon=1, frequency="h")
-        # Model loading check
-        if prediction is not None:
+        data = [{"ts": (now - timedelta(hours=i)).isoformat() + "Z", "value": float(i)} for i in range(5, 0, -1)]
+        result = model.predict(data, horizon=1, freq="h")
+        if result is not None and 'forecasts' in result:
             return {"status": "healthy", "model": "ready"}
         else:
-            logger.error("Health check failed: Model returned None")
+            logger.error("Model returned None or invalid result")
             raise HTTPException(status_code=503, detail="Model not ready")
     except Exception as e:
-        logger.error(f"Health check failed with exception: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}")

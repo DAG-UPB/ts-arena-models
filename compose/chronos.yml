@@ -1,5 +1,5 @@
 services:
-  chronos-base: &chronos-base
+  chronos-template: &chronos-template
     extends:
       file: base.yml
       service: gpu-model-base
@@ -10,26 +10,26 @@ services:
     profiles: ["chronos", "all-models"]
 
   chronos-bolt-tiny:
-    <<: *chronos-base
+    <<: *chronos-template
     environment:
       - MODEL_ID=amazon/chronos-bolt-tiny
 
   chronos-bolt-small:
-    <<: *chronos-base
+    <<: *chronos-template
     environment:
       - MODEL_ID=amazon/chronos-bolt-small
 
   chronos-bolt-base:
-    <<: *chronos-base
+    <<: *chronos-template
     environment:
       - MODEL_ID=amazon/chronos-bolt-base
 
   chronos-bolt-mini:
-    <<: *chronos-base
+    <<: *chronos-template
     environment:
       - MODEL_ID=amazon/chronos-bolt-mini
 
   chronos-2:
-    <<: *chronos-base
+    <<: *chronos-template
     environment:
       - MODEL_ID=amazon/chronos-2

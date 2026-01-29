@@ -1,5 +1,5 @@
 services:
-  sundial-base: &sundial-base
+  sundial-template: &sundial-template
     extends:
       file: base.yml
       service: gpu-model-base
@@ -10,6 +10,6 @@ services:
     profiles: ["sundial", "all-models"]
 
   sundial-128m:
-    <<: *sundial-base
+    <<: *sundial-template
     environment:
       - MODEL_ID=thuml/sundial-base-128m

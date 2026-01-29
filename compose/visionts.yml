@@ -1,0 +1,22 @@
+services:
+  visionts-template: &visionts-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: visionts
+    build:
+      context: ../model-services/visionts
+      dockerfile: Dockerfile
+    profiles: ["visionts", "all-models"]
+
+  visiontspp-base:
+    <<: *visionts-template
+    environment:
+      - MODEL_ID=visiontspp_base.ckpt
+      - VM_ARCH=mae_base
+
+  visiontspp-large:
+    <<: *visionts-template
+    environment:
+      - MODEL_ID=visiontspp_large.ckpt
+      - VM_ARCH=mae_large

@@ -1,5 +1,5 @@
 services:
-  timesfm-base: &timesfm-base
+  timesfm-template: &timesfm-template
     extends:
       file: base.yml
       service: gpu-model-base
@@ -10,12 +10,12 @@ services:
     profiles: ["timesfm", "all-models"]
 
   timesfm-1.0-200m:
-    <<: *timesfm-base
+    <<: *timesfm-template
     environment:
       - MODEL_ID=google/timesfm-1.0-200m-pytorch
 
   timesfm-2.0-500m:
-    <<: *timesfm-base
+    <<: *timesfm-template
     environment:
       - MODEL_ID=google/timesfm-2.0-500m-pytorch
 

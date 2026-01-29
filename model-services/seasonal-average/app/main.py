@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Union, Dict, Optional
@@ -39,7 +40,7 @@ def infer_seasonality_from_freq(freq: str) -> int:
         "W": 52,         # Yearly pattern (52 weeks per year)
         "M": 12,         # Yearly pattern (12 months per year)
     }
-    return seasonality_map.get(freq)  # Default to 24 if unknown frequency
+    return seasonality_map.get(freq, 24)  # Default to 24 if unknown frequency
 
 
 def generate_future_timestamps(last_timestamp: datetime, horizon: int, freq: str) -> List[str]:
@@ -79,7 +80,14 @@ def create_forecast_items(timestamps: List[str], values: List[float]) -> List[Fo
 
 
 app = FastAPI()
-model = SeasonalAverageModel()
+
+num_seasons_env = os.environ.get("SEASONAL_SEASONS")
+if num_seasons_env:
+    num_seasons = int(num_seasons_env)
+else:
+    num_seasons = 3
+
+model = SeasonalAverageModel(num_seasons=num_seasons)
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -87,22 +95,25 @@ async def predict(request: PredictionRequest):
     if not request.history:
         raise HTTPException(status_code=400, detail="History cannot be empty")
     
-    freq = request.freq
+    freq = request.freq or "h"
     seasonality = infer_seasonality_from_freq(freq)
     is_batch = isinstance(request.history[0], list)
     
     if is_batch:
         history_values = []
         last_timestamps = []
+        offsets = []
         for series in request.history:
-            values = [item.value for item in series]
-            history_values.append(values)
             # Parse last timestamp
             last_ts = datetime.fromisoformat(series[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
+            
+            values = [item.value for item in series]
+            history_values.append(values)
             last_timestamps.append(last_ts)
+            offsets.append(0)
         
         # Get predictions from model
-        predictions = model.predict(history_values, request.horizon, seasonality)
+        predictions = model.predict(history_values, request.horizon, seasonality, offset=offsets)
         
         # Create ForecastItems for each series
         all_forecasts = []
@@ -114,11 +125,13 @@ async def predict(request: PredictionRequest):
         return {"prediction": all_forecasts}
     else:
         # Single series
-        history_values = [item.value for item in request.history]
-        last_ts = datetime.fromisoformat(request.history[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
+        series = request.history
+        last_ts = datetime.fromisoformat(series[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
+        
+        history_values = [item.value for item in series]
         
         # Get prediction from model
-        prediction = model.predict(history_values, request.horizon, seasonality)
+        prediction = model.predict(history_values, request.horizon, seasonality, offset=0)
         
         # Create ForecastItems
         future_ts = generate_future_timestamps(last_ts, request.horizon, freq)

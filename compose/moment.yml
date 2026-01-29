@@ -1,5 +1,5 @@
 services:
-  moment-base: &moment-base
+  moment-template: &moment-template
     extends:
       file: base.yml
       service: gpu-model-base
@@ -10,16 +10,16 @@ services:
     profiles: ["moment", "all-models"]
 
   moment-small:
-    <<: *moment-base
+    <<: *moment-template
     environment:
       - MODEL_ID=AutonLab/MOMENT-1-small
 
   moment-base-model:
-    <<: *moment-base
+    <<: *moment-template
     environment:
       - MODEL_ID=AutonLab/MOMENT-1-base
 
   moment-large:
-    <<: *moment-base
+    <<: *moment-template
     environment:
       - MODEL_ID=AutonLab/MOMENT-1-large

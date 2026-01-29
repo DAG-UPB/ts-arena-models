@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pandas
+torch
+torchvision
+visionts
+python-dateutil
+einops
+timm
+huggingface_hub
+requests
