@@ -7,7 +7,7 @@
         "hosting": "UPB",
         "architecture": "decoder-only",
         "pretraining_data": "TimesFM 1.0 dataset + LOTSA subset",
-        "publishing_date": "2024-10-03",
+        "publishing_date": "2024-12-20",
         "parameters": {
             "additionalProp1": {}
         },
@@ -35,7 +35,7 @@
         "hosting": "UPB",
         "architecture": "decoder-only",
         "pretraining_data": "TimeBench (1 trillion time points)",
-        "publishing_date": "2025-02-01",
+        "publishing_date": "2025-02-02",
         "parameters": {
             "additionalProp1": {}
         },
@@ -47,9 +47,9 @@
         "model_family": "time-moe",
         "model_size": 50,
         "hosting": "UPB",
-        "architecture": "mixture-of-experts",
+        "architecture": "decoder-only, mixture-of-experts",
         "pretraining_data": "Time-300B (300 billion time points)",
-        "publishing_date": "2024-09-16",
+        "publishing_date": "2024-09-24",
         "parameters": {
             "additionalProp1": {}
         },
@@ -61,9 +61,9 @@
         "model_family": "time-moe",
         "model_size": 200,
         "hosting": "UPB",
-        "architecture": "mixture-of-experts",
+        "architecture": "decoder-only, mixture-of-experts",
         "pretraining_data": "Time-300B (300 billion time points)",
-        "publishing_date": "2024-09-16",
+        "publishing_date": "2024-09-24",
         "parameters": {
             "additionalProp1": {}
         },
@@ -133,7 +133,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "real-world and synthetic datasets",
-        "publishing_date": "2025-10-19",
+        "publishing_date": "2025-10-17",
         "parameters": {
             "additionalProp1": {}
         },
@@ -147,7 +147,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "LOTSA (27 billion observations)",
-        "publishing_date": "2024-06-18",
+        "publishing_date": "2024-02-04",
         "parameters": {
             "additionalProp1": {}
         },
@@ -161,7 +161,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "LOTSA (27 billion observations)",
-        "publishing_date": "2024-06-18",
+        "publishing_date": "2024-02-04",
         "parameters": {
             "additionalProp1": {}
         },
@@ -175,7 +175,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "LOTSA (27 billion observations)",
-        "publishing_date": "2024-06-18",
+        "publishing_date": "2024-02-04",
         "parameters": {
             "additionalProp1": {}
         },
@@ -189,7 +189,7 @@
         "hosting": "UPB",
         "architecture": "decoder-only",
         "pretraining_data": "GIFT-Eval Pretrain subset + additional data",
-        "publishing_date": "2025-08-12",
+        "publishing_date": "2025-11-12",
         "parameters": {
             "additionalProp1": {}
         },
@@ -203,7 +203,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
-        "publishing_date": "2024-05-01",
+        "publishing_date": "2024-02-06",
         "parameters": {
             "additionalProp1": {}
         },
@@ -217,7 +217,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
-        "publishing_date": "2024-05-01",
+        "publishing_date": "2024-02-06",
         "parameters": {
             "additionalProp1": {}
         },
@@ -231,7 +231,7 @@
         "hosting": "UPB",
         "architecture": "encoder-only",
         "pretraining_data": "Time Series Pile (1.23 billion timestamps)",
-        "publishing_date": "2024-05-01",
+        "publishing_date": "2024-02-06",
         "parameters": {
             "additionalProp1": {}
         },
@@ -362,5 +362,117 @@
             "additionalProp1": {}
         },
         "organization_id": 1
+    },
+    "flowstate": {
+        "name": "ibm-research/flowstate",
+        "model_type": "TSFM",
+        "model_family": "flowstate",
+        "model_size": 2,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "GiftEval pretrain data, TiRex data apart from synthetic datasets",
+        "publishing_date": "2025-08-07",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 10
+    },
+    "tinytimemixer-r1-512-96": {
+        "name": "ibm-granite/granite-timeseries-ttm-r1",
+        "model_type": "TSFM",
+        "model_family": "tinytimemixer",
+        "model_size": 1,
+        "hosting": "UPB",
+        "architecture": "TSMixer",
+        "pretraining_data": "Parts of Monash and LibCity",
+        "publishing_date": "2024-01-08",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "tinytimemixer-r1-1024-96": {
+        "name": "ibm-granite/granite-timeseries-ttm-r1",
+        "model_type": "TSFM",
+        "model_family": "tinytimemixer",
+        "model_size": 1,
+        "hosting": "UPB",
+        "architecture": "TSMixer",
+        "pretraining_data": "Parts of Monash and LibCity",
+        "publishing_date": "2024-01-08",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "tinytimemixer-r2-512-96": {
+        "name": "ibm-granite/granite-timeseries-ttm-r2",
+        "model_type": "TSFM",
+        "model_family": "tinytimemixer",
+        "model_size": 1,
+        "hosting": "UPB",
+        "architecture": "TSMixer",
+        "pretraining_data": "Parts of Monash and LibCity",
+        "publishing_date": "2024-10-08",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "tinytimemixer-r2-1024-96": {
+        "name": "ibm-granite/granite-timeseries-ttm-r2",
+        "model_type": "TSFM",
+        "model_family": "tinytimemixer",
+        "model_size": 1,
+        "hosting": "UPB",
+        "architecture": "TSMixer",
+        "pretraining_data": "Parts of Monash and LibCity",
+        "publishing_date": "2024-10-08",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 7
+    },
+    "tirex": {
+        "name": "NX-AI/TiRex",
+        "model_type": "TSFM",
+        "model_family": "tirex",
+        "model_size": 35,
+        "hosting": "UPB",
+        "architecture": "xLSTM",
+        "pretraining_data": "Chronos dataset, synthetic data and parts of GiftEval",
+        "publishing_date": "2025-05-29",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 8
+    },
+    "visiontspp-base": {
+        "name": "visiontspp_base.ckpt",
+        "model_type": "TSFM",
+        "model_family": "visionts",
+        "model_size": 86,
+        "hosting": "UPB",
+        "architecture": "Vision Transformer",
+        "pretraining_data": "LOTSA as images",
+        "publishing_date": "2025-08-06",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 9
+    },
+    "visiontspp-large": {
+        "name": "visiontspp_large.ckpt",
+        "model_type": "TSFM",
+        "model_family": "visionts",
+        "model_size": 307,
+        "hosting": "UPB",
+        "architecture": "Vision Transformer",
+        "pretraining_data": "LOTSA as images",
+        "publishing_date": "2025-08-06",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 9
     }
 }
