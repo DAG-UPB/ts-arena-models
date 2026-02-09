@@ -5,13 +5,11 @@ services:
     build: ./master-controller
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     ports:
-      - "8456:8000"
+      - "${MASTER_API_PORT}:8000"
     environment:
       - DOCKER_HOST=http://docker-proxy:2375
       - TARGET_LABEL=managed.by=controller
       - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
-    env_file:
-      - .env
     networks:
       - internal
     depends_on:
@@ -33,24 +31,6 @@ services:
     networks:
       - internal
 
-  challenge-uploads:
-    build: ./challenge-uploads
-    environment:
-      - API_BASE_URL=${API_BASE_URL:-http://api-portal:8000}
-      - MASTER_CONTROLLER_URL=http://master-controller-api:8000
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-600}
-      - API_UPLOAD_KEY=${API_UPLOAD_KEY}
-      - USER_ID=${USER_ID}
-      - CHECK_INTERVAL=${CHECK_INTERVAL:-60}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    env_file:
-      - .env
-    networks:
-      - internal
-    depends_on:
-      - master-controller-api
-      - docker-proxy
-
 include:
   - compose/chronos.yml
   - compose/timesfm.yml
@@ -60,14 +40,13 @@ include:
   - compose/sundial.yml
   - compose/statistical.yml
   - compose/neuralforecast.yml
-  - compose/tirex.yml
-  - compose/visionts.yml
   - compose/flowstate.yml
   - compose/tinytimemixer.yml
+  - compose/tirex.yml
+  - compose/visionts.yml
 
 volumes:
   arena-db:
-
 
 networks:
   default:

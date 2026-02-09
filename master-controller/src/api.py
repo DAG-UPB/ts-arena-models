@@ -70,8 +70,12 @@ async def predict_batch(request: PredictionRequest):
     predictions = []
 
     try:
+        # Get the compose project name from environment variable
+        compose_project_name = os.environ.get("COMPOSE_PROJECT_NAME", "ts-models")
+        service_name = f"{compose_project_name}-{request.model_name}-1"
+
         with Worker(
-            service_name= "ts-models-" + request.model_name + "-1",
+            service_name=service_name,
             base_url=f"http://{request.model_name}",
         ) as worker:
             # Convert Pydantic models to dicts for JSON serialization
