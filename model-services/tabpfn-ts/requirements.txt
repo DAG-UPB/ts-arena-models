@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+pandas
+python-dateutil
+tabpfn-time-series
+tabpfn>=6.0.6
+torch
+numpy

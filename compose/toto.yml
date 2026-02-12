@@ -1,0 +1,12 @@
+services:
+  toto:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: toto
+    build:
+      context: ../model-services/toto
+      dockerfile: Dockerfile
+    profiles: ["toto", "all-models"]
+    environment:
+      - MODEL_ID=Datadog/Toto-Open-Base-1.0

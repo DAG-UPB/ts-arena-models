@@ -474,5 +474,33 @@
             "additionalProp1": {}
         },
         "organization_id": 9
+    },
+    "tabpfn-ts": {
+        "name": "tabpfn-ts",
+        "model_type": "TSFM",
+        "model_family": "tabpfn-ts",
+        "model_size": 11,
+        "hosting": "UPB",
+        "architecture": "TabPFN-v2",
+        "pretraining_data": "Synthetic data",
+        "publishing_date": "2025-01-06",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 10
+    },
+    "toto": {
+        "name": "toto",
+        "model_type": "TSFM",
+        "model_family": "toto",
+        "model_size": 151,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Own data, Gift-Eval, Chronos",
+        "publishing_date": "2025-05-20",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 11
     }
 }
