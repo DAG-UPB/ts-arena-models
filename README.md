@@ -6,7 +6,7 @@ Welcome to the **TS-Models** repository! This project is a core component of the
 
 TS-Arena is a platform for time series forecasting challenges. Unlike traditional benchmarks on static datasets, TS-Arena challenges participants to predict **live data** into the real future. Evaluations are performed automatically once the ground truth data points become available.
 
-**Main project:** [https://github.com/DAG-UPB/ts-arena](https://github.com/DAG-UPB/ts-arena)
+
 
 ## 🎯 Purpose of this Repository
 
