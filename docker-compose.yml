@@ -43,6 +43,10 @@ services:
       - USER_ID=${USER_ID}
       - CHECK_INTERVAL=${CHECK_INTERVAL:-60}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_DIR=/app/logs
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-3}
+    volumes:
+      - ./logs/challenge-uploads:/app/logs
     env_file:
       - .env
     networks:

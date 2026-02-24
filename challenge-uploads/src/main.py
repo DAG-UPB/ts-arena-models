@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import logging.handlers
 import json
 import re
 import csv
@@ -16,10 +17,27 @@ import isodate
 load_dotenv()
 time.sleep(2)
 
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
-    format="%(asctime)s [%(levelname)s] %(message)s",
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+LOG_DIR = os.environ.get("LOG_DIR", "/app/logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+_log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+
+# Console handler (existing behaviour)
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(_log_formatter)
+
+# Rotating file handler — one file per day, keep last 3 days
+_file_handler = logging.handlers.TimedRotatingFileHandler(
+    filename=os.path.join(LOG_DIR, "challenge-upload.log"),
+    when="midnight",
+    backupCount=3,
+    encoding="utf-8",
+    utc=True,
 )
+_file_handler.setFormatter(_log_formatter)
+
+logging.basicConfig(level=LOG_LEVEL, handlers=[_console_handler, _file_handler])
 logger = logging.getLogger(__name__)
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8457")
@@ -29,20 +47,24 @@ API_KEY = os.environ.get("API_UPLOAD_KEY", "default_api_key")
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", "60"))
 USER_ID = os.environ.get("USER_ID")
 CONFIG_FILE = os.environ.get("CONFIG_FILE", "config.json")
-PARTICIPATION_LOG_FILE = os.environ.get("PARTICIPATION_LOG_FILE", "participation_log.csv")
+PARTICIPATION_LOG_FILE = os.environ.get(
+    "PARTICIPATION_LOG_FILE", os.path.join(LOG_DIR, "participation_log.csv")
+)
+LOG_RETENTION_DAYS = int(os.environ.get("LOG_RETENTION_DAYS", "3"))
 
-def log_participation(round_id: str, challenge_name: str, model_container: str, 
-                      api_model_name: str, status: str, message: str = ""):
+def log_participation(round_id: str, challenge_name: str, model_container: str,
+                      api_model_name: str, status: str, message: str = "",
+                      duration_s: Optional[float] = None):
     """Log participation details to CSV file"""
     file_exists = os.path.exists(PARTICIPATION_LOG_FILE)
-    
+
     try:
         with open(PARTICIPATION_LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             if not file_exists:
-                writer.writerow(["Timestamp", "Challenge ID", "Challenge Name", "Model Container", 
-                                 "API Model Name", "Status", "Message"])
-            
+                writer.writerow(["Timestamp", "Challenge ID", "Challenge Name", "Model Container",
+                                 "API Model Name", "Status", "Duration (s)", "Message"])
+
             writer.writerow([
                 datetime.now().isoformat(),
                 round_id,
@@ -50,10 +72,49 @@ def log_participation(round_id: str, challenge_name: str, model_container: str,
                 model_container,
                 api_model_name,
                 status,
+                f"{duration_s:.2f}" if duration_s is not None else "",
                 message
             ])
     except Exception as e:
         logger.error(f"Error writing to participation log: {e}")
+
+
+def cleanup_participation_log():
+    """Remove participation log entries older than LOG_RETENTION_DAYS days."""
+    if not os.path.exists(PARTICIPATION_LOG_FILE):
+        return
+
+    cutoff = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
+    kept_rows = []
+    removed = 0
+
+    try:
+        with open(PARTICIPATION_LOG_FILE, mode='r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            if header is None:
+                return
+            kept_rows.append(header)
+            for row in reader:
+                if not row:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(row[0])
+                    if ts >= cutoff:
+                        kept_rows.append(row)
+                    else:
+                        removed += 1
+                except (ValueError, IndexError):
+                    kept_rows.append(row)  # keep rows with unparseable timestamps
+
+        with open(PARTICIPATION_LOG_FILE, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(kept_rows)
+
+        if removed:
+            logger.info(f"Participation log: removed {removed} entries older than {LOG_RETENTION_DAYS} days")
+    except Exception as e:
+        logger.error(f"Error cleaning up participation log: {e}")
 
 # --- HTTP Helper Functions ---
 def http_get(path: str, with_auth: bool = True) -> requests.Response:
@@ -430,26 +491,39 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     # Process for each model in active_models
     for container_name, api_model_name in active_models:
         logger.info(f"  Creating predictions with container {container_name} for model {api_model_name}")
-        
+
+        t_start: Optional[float] = None
         try:
-            # Predict uses container_name
+            # Predict uses container_name — measure inference time
+            t_start = time.perf_counter()
             predictions = predict_with_model(container_name, histories, horizon_steps, model_freq)
+            duration_s = time.perf_counter() - t_start
+
             if not predictions:
-                logger.warning(f"  No predictions for container {container_name}")
-                log_participation(str(round_id), challenge_name, container_name, api_model_name, "FAILURE", "Prediction returned None or invalid format")
+                logger.warning(f"  No predictions for container {container_name} ({duration_s:.2f}s)")
+                log_participation(str(round_id), challenge_name, container_name, api_model_name,
+                                  "FAILURE", "Prediction returned None or invalid format",
+                                  duration_s=duration_s)
                 continue
-            
+
+            logger.info(f"  Prediction done in {duration_s:.2f}s ({container_name})")
+
             # Format forecasts
             forecasts = format_forecasts(predictions, series_names, max_timestamps, frequency_delta)
-            
+
             # Upload uses api_model_name
             upload_forecasts(int(round_id), container_name, forecasts)
-            log_participation(str(round_id), challenge_name, container_name, api_model_name, "SUCCESS", f"Uploaded {len(forecasts)} series")
-            
+            log_participation(str(round_id), challenge_name, container_name, api_model_name,
+                              "SUCCESS", f"Uploaded {len(forecasts)} series",
+                              duration_s=duration_s)
+
         except Exception as e:
+            duration_s = (time.perf_counter() - t_start) if t_start is not None else None
             error_details = traceback.format_exc()
             logger.error(f"Error processing model {container_name}: {e}")
-            log_participation(str(round_id), challenge_name, container_name, api_model_name, "FAILURE", f"{str(e)}\n{error_details}")
+            log_participation(str(round_id), challenge_name, container_name, api_model_name,
+                              "FAILURE", f"{str(e)}\n{error_details}",
+                              duration_s=duration_s)
 
 
 def main_loop():
@@ -458,6 +532,9 @@ def main_loop():
     logger.info(f"API Base URL: {API_BASE_URL}")
     logger.info(f"Master Controller URL: {MASTER_CONTROLLER_URL}")
     logger.info(f"Check Interval: {CHECK_INTERVAL}s")
+    logger.info(f"Log directory: {LOG_DIR} (retention: {LOG_RETENTION_DAYS} days)")
+
+    cleanup_participation_log()
     
     # Model initialization
     config = load_config()
@@ -510,7 +587,9 @@ def main_loop():
 def main_once():
     """One-time execution for testing"""
     logger.info("One-time challenge processing")
-    
+
+    cleanup_participation_log()
+
     # Model initialization
     config = load_config()
     registered_models = fetch_registered_models()
