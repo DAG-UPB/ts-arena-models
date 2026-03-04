@@ -1,7 +1,8 @@
 fastapi
 uvicorn
 pydantic
+setuptools
 uni2ts
-gluonts[torch]
-numpy
+gluonts[torch]~=0.14.3
+numpy~=1.26.0
 pandas
