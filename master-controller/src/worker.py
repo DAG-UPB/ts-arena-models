@@ -20,7 +20,7 @@ class Worker:
     to ensure that the Docker container is started before the prediction
     and properly shut down afterwards.
     """
-    def __init__(self, service_name: str, base_url: str, port: int = 8000, timeout: float = 300):
+    def __init__(self, service_name: str, base_url: str, port: int = 8000, timeout: float = 300, keep_alive: bool = False):
         """
         Initializes the worker.
 
@@ -29,6 +29,7 @@ class Worker:
             base_url (str): The base URL for the prediction endpoint (e.g. 'http://localhost').
             port (int, optional): The port on which the worker's API runs. Default is 8000.
             timeout (float, optional): Timeout for HTTP requests in seconds. Default is 120.0.
+            keep_alive (bool, optional): If True, the container will NOT be stopped on exit. Default is False.
         """
         self.service_name = service_name
         self.base_url = base_url
@@ -36,6 +37,7 @@ class Worker:
         self.predict_url = f"{self.base_url}:{self.port}/predict"
         self.timeout = timeout
         self.container = None
+        self.keep_alive = keep_alive
 
     def __enter__(self):
         """Starts the container and returns the Worker object."""
@@ -44,7 +46,8 @@ class Worker:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Stops the container when the `with` block is exited."""
-        self.stop()
+        if not self.keep_alive:
+            self.stop()
 
     def start(self):
         """Starts the worker container and waits until it is operational (healthy)."""
@@ -92,6 +95,13 @@ class Worker:
 
     def stop(self):
         """Stops the worker container."""
+        if self.container is None:
+            try:
+                self.container = client.containers.get(self.service_name)
+            except docker.errors.NotFound:
+                logging.info(f"Container '{self.service_name}' not found, nothing to stop.")
+                return
+
         if self.container:
             self.container.reload()
             if self.container.status == "running":
@@ -100,8 +110,6 @@ class Worker:
                 logging.info(f"Container '{self.service_name}' stopped.")
             else:
                 logging.info(f"Container '{self.service_name}' is not running.")
-        else:
-            logging.info(f"No container to stop for '{self.service_name}'.")
 
     def predict(self, data=None):
         """
@@ -142,6 +150,18 @@ def ensure_started():
         if c.status != "running":
             logging.info(f"Starting container '{c.name}'...")
             c.start()
+
+
+def get_available_models() -> list[str]:
+    """Returns a list of available model names based on Docker containers."""
+    containers = list_targets()
+    models = set()
+    for container in containers:
+        # Use Docker Compose service name as the model name
+        service_name = container.labels.get("com.docker.compose.service")
+        if service_name:
+            models.add(service_name)
+    return sorted(list(models))
 
 
 def ensure_stopped(timeout=10):
