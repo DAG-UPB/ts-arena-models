@@ -68,6 +68,8 @@ include:
   - compose/visionts.yml
   - compose/flowstate.yml
   - compose/tinytimemixer.yml
+  - compose/tabpfn-ts.yml
+  - compose/toto.yml
 
 volumes:
   arena-db:
