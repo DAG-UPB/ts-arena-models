@@ -1,8 +1,11 @@
 import torch
-from visionts import VisionTSpp, freq_to_seasonality_list
+from visionts import VisionTSpp
 import numpy as np
 import os
+import logging
 from typing import List, Union, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -81,18 +84,23 @@ class VisionTSModel:
 
         # Determine periodicity from frequency
         periodicity = self._get_periodicity(freq)
-        
+
         # Find max length for padding
         max_len = max(len(h) for h in history)
         context_len = max_len
         
         # Update model config
+        img_size = self.model.vision_model.patch_embed.img_size[0]
+        patch_size = self.model.vision_model.patch_embed.patch_size[0]
+        num_patch_input = (img_size // patch_size) // 2
+
         self.model.update_config(
             context_len=context_len,
             pred_len=horizon,
             periodicity=periodicity,
+            num_patch_input=num_patch_input,
             norm_const=0.4,
-            align_const=0.4,
+            padding_mode='constant',
         )
 
         results = []
@@ -155,29 +163,35 @@ class VisionTSModel:
 
     def _get_periodicity(self, freq: str) -> int:
         """
-        Get periodicity based on frequency string.
+        Get periodicity (number of intervals per seasonal cycle) based on
+        the frequency string.
+
+        Uses a known mapping first, because the visionts helper
+        ``freq_to_seasonality_list`` relies on pandas frequency aliases that
+        changed in pandas >= 2.2 ("T" → "min"), causing it to return ``[1]``
+        for sub-hourly frequencies.
         """
-        # Use VisionTS's built-in utility if available
+        freq_to_period = {
+            "1min": 1440,
+            "5min": 288,
+            "10min": 144,
+            "15min": 96,
+            "30min": 48,
+            "h": 24,
+            "D": 7,
+            "W": 52,
+            "M": 12,
+        }
+        if freq in freq_to_period:
+            return freq_to_period[freq]
+
+        # Try the library utility
         try:
+            from visionts import freq_to_seasonality_list
             periods = freq_to_seasonality_list(freq)
-            if periods:
+            if periods and periods[0] > 1:
                 return periods[0]
         except Exception:
             pass
-        
-        # Fallback mapping using frequency strings
-        freq_to_period = {
-            # Minute intervals: periodicity = intervals per day
-            "1min": 1440,   # 24*60 = 1440 minutes per day
-            "15min": 96,    # 24*60/15 = 96 intervals per day
-            "30min": 48,    # 24*60/30 = 48 intervals per day
-            # Hourly: 24 hours per day
-            "h": 24,
-            # Daily: 7 days per week
-            "D": 7,
-            # Weekly: 52 weeks per year
-            "W": 52,
-            # Monthly: 12 months per year
-            "M": 12,
-        }
-        return freq_to_period.get(freq, 24)
+
+        raise ValueError(f"Unknown frequency '{freq}': cannot determine periodicity")
