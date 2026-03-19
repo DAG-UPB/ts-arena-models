@@ -60,56 +60,51 @@ class TabPFNTSModel:
         else:
             data_as_batch = [data]
 
-        # Build a combined context DataFrame with item_id, timestamp, target
-        all_rows = []
+        # Predict each series individually to avoid cross-series interference in the combined DataFrame (batching corrupts predictions).
+        all_forecasts = []
+        all_quantiles = {}
+
         for idx, series_data in enumerate(data_as_batch):
-            item_id = f"series_{idx}"
-            for item in series_data:
-                all_rows.append(
-                    {
-                        "item_id": item_id,
-                        "timestamp": pd.Timestamp(item["ts"]),
-                        "target": float(item["value"]),
-                    }
+            rows = [
+                {
+                    "item_id": f"series_{idx}",
+                    "timestamp": pd.Timestamp(item["ts"]),
+                    "target": float(item["value"]),
+                }
+                for item in series_data
+            ]
+            context_df = pd.DataFrame(rows)
+            context_df["timestamp"] = pd.to_datetime(
+                context_df["timestamp"], utc=True
+            ).dt.tz_localize(None)
+
+            try:
+                pred_df = self.pipeline.predict_df(
+                    context_df,
+                    prediction_length=horizon,
+                    quantiles=QUANTILE_LEVELS,
                 )
+            except Exception as e:
+                logger.error(
+                    f"TabPFN-TS prediction failed for series {idx}: {e}",
+                    exc_info=True,
+                )
+                raise
 
-        context_df = pd.DataFrame(all_rows)
-        # Ensure timestamp column is timezone-naive datetime64 (required by TabPFN-TS TimeSeriesDataFrame)
-        context_df["timestamp"] = pd.to_datetime(context_df["timestamp"], utc=True).dt.tz_localize(None)
-
-        # Run prediction via predict_df
-        try:
-            pred_df = self.pipeline.predict_df(
-            context_df,
-            prediction_length=horizon,
-            quantiles=QUANTILE_LEVELS,
-        )
-        except Exception as e:
-            logger.error(f"TabPFN-TS prediction failed: {e}", exc_info=True)
-            raise
-
-        # Parse results back into the expected format
-        if is_batch:
-            all_forecasts = []
-            all_quantiles = {}
-            for idx in range(len(data_as_batch)):
-                item_id = f"series_{idx}"
-                item_pred = pred_df.loc[item_id] if item_id in pred_df.index.get_level_values(0) else pred_df
-                all_forecasts.append(item_pred["target"].tolist())
-                quantile_dict = {}
-                for q in QUANTILE_LEVELS:
-                    col = str(q)
-                    if col in item_pred.columns:
-                        quantile_dict[col] = item_pred[col].tolist()
-                all_quantiles[idx] = quantile_dict
-            return {"forecasts": all_forecasts, "quantiles": all_quantiles}
-        else:
             if isinstance(pred_df.index, pd.MultiIndex):
                 pred_df = pred_df.droplevel(0)
-            forecasts = pred_df["target"].tolist()
+
+            all_forecasts.append(pred_df["target"].tolist())
             quantile_dict = {}
             for q in QUANTILE_LEVELS:
-                col = str(q)
-                if col in pred_df.columns:
-                    quantile_dict[col] = pred_df[col].tolist()
-            return {"forecasts": forecasts, "quantiles": quantile_dict}
+                if q in pred_df.columns:
+                    quantile_dict[str(q)] = pred_df[q].tolist()
+            all_quantiles[idx] = quantile_dict
+
+        if is_batch:
+            return {"forecasts": all_forecasts, "quantiles": all_quantiles}
+        else:
+            return {
+                "forecasts": all_forecasts[0],
+                "quantiles": all_quantiles[0],
+            }
