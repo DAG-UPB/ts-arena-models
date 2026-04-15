@@ -78,6 +78,26 @@ class TabPFNTSModel:
                 context_df["timestamp"], utc=True
             ).dt.tz_localize(None)
 
+            # Fill timestamp gaps so freq is always inferrable. Any gap in the series makes TimeSeriesDataFrame.freq return None, which crashes predict_df
+            # Reindex onto a complete date_range using the known freq; gaps become NaN and are handled internally.
+            context_df = context_df.set_index("timestamp")
+            complete_index = pd.date_range(
+                start=context_df.index.min(),
+                end=context_df.index.max(),
+                freq=freq,
+            )
+            context_df = (
+                context_df.reindex(complete_index)
+                .rename_axis("timestamp")
+                .reset_index()
+            )
+            context_df["item_id"] = f"series_{idx}"
+            n_gaps = context_df["target"].isna().sum()
+            if n_gaps:
+                logger.warning(
+                    f"Series {idx}: {n_gaps} timestamp gap(s) detected and filled with NaN."
+                )
+
             try:
                 pred_df = self.pipeline.predict_df(
                     context_df,
