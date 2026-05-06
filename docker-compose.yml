@@ -28,6 +28,7 @@ services:
       - NETWORKS=0
       - VOLUMES=0
       - POST=1
+      - LOG_LEVEL=info
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -73,7 +74,6 @@ include:
 
 volumes:
   arena-db:
-
 
 networks:
   default:
