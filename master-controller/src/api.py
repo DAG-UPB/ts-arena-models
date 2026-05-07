@@ -41,7 +41,7 @@ history_example = [
   ]
 class HistoryItem(BaseModel):
     ts: str
-    value: float
+    value: Optional[float] = None
 
 
 app = FastAPI()

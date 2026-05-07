@@ -5,7 +5,7 @@ services:
     build: ./master-controller
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     ports:
-      - "8456:8000"
+      - "${MASTER_API_PORT:-8456}:8000"
     environment:
       - DOCKER_HOST=http://docker-proxy:2375
       - TARGET_LABEL=managed.by=controller
