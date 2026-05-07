@@ -44,8 +44,11 @@ class TimesFMModel:
             raise
         
         # Default config
-        self.max_context = 2048
+        self.max_context = 15360
+        # This max horizon should be more than the maximum 
+        # horizon requested by the benchmark.
         self.max_horizon = 256
+        logger.warning(f"max_horizon={self.max_horizon} should be more than the maximum horizon requested by the benchmark")
         
         self.config = timesfm.ForecastConfig(
             max_context=self.max_context,
