@@ -62,7 +62,7 @@ def create_forecast_items(timestamps: List[str], values: List[float]) -> List[Fo
 
 
 app = FastAPI()
-model = NaiveForecastModel()  # however this works
+model = NaiveForecastModel()
 
 
 @app.post("/predict", response_model=PredictionResponse)
