@@ -67,30 +67,59 @@ class TiRexModel:
         
         context = torch.tensor(padded_history, dtype=torch.float32).to(device)
         
-        # TiRex returns quantiles and mean
+        # TiRex returns quantiles and mean.
+        # NOTE: the `tirex` library is NOT importable offline, so
+        # ForecastModel.forecast's signature cannot be introspected here. The
+        # call below omits a `quantile_levels` kwarg. If TiRex's forecast()
+        # accepts a `quantile_levels` (or `quantiles`) parameter, pass
+        # `quantile_levels=quantile_levels` explicitly to guarantee the output
+        # axis matches the requested levels — MUST be confirmed live on the
+        # GPU host. As a defensive guard we assert the returned quantile axis
+        # length equals 9 below.
         with torch.no_grad():
             quantiles, mean = self.model.forecast(
                 context=context,
                 prediction_length=horizon
             )
-        
+
         # Convert to numpy
         mean_np = mean.cpu().numpy()
         quantiles_np = quantiles.cpu().numpy()
-        
+
+        EXPECTED_QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+        # Defensive guard: quantiles_np axis order is assumed to be
+        # (batch, horizon, n_levels). The exact level ordering MUST be confirmed
+        # live on the GPU host by inspecting self.model's config /
+        # ForecastModel.forecast output metadata.
+        if quantiles_np.shape[-1] != len(EXPECTED_QUANTILE_LEVELS):
+            raise RuntimeError(
+                f"TiRex returned {quantiles_np.shape[-1]} quantile levels, "
+                f"expected {len(EXPECTED_QUANTILE_LEVELS)} "
+                f"(levels {EXPECTED_QUANTILE_LEVELS}). Confirm the model's "
+                f"quantile grid live on the GPU host."
+            )
+        if list(quantile_levels) != EXPECTED_QUANTILE_LEVELS:
+            raise RuntimeError(
+                f"quantile_levels {quantile_levels} != expected "
+                f"{EXPECTED_QUANTILE_LEVELS}; this code assumes the default "
+                f"9-decile grid ordered 0.1..0.9."
+            )
+
         results = []
         quantiles_results = []
-        
+
         for i in range(len(history)):
-            # Quantile forecasts
+            # Quantile forecasts: emit a q_* entry only for levels the model
+            # actually produced. Do NOT fabricate entries for missing levels
+            # (the backend handles degenerate substitution centrally per
+            # backend #13).
             quantile_dict = {}
-            for level in quantile_levels:
-                if level in quantile_levels:
-                    idx = quantile_levels.index(level)
-                    quantile_dict[str(level)] = quantiles_np[i, :, idx].tolist()
-            
+            for idx, level in enumerate(quantile_levels):
+                quantile_dict[str(level)] = quantiles_np[i, :, idx].tolist()
+
             quantiles_results.append(quantile_dict)
-            
+
             # Use q_0.5 (median) as point forecast for consistency
             median_idx = quantile_levels.index(0.5)
             results.append(quantiles_np[i, :, median_idx].tolist())

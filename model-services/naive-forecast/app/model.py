@@ -1,27 +1,107 @@
-from typing import List, Union
+from __future__ import annotations
+
+import math
+from typing import Any, Dict, List, Union
+
+# Standard 9 decile levels used across TS-Arena model services.
+QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+
+def _percentile(data: List[float], q: float) -> float:
+    """Linear-interpolation percentile, matching numpy's default method.
+
+    ``q`` is a probability in [0, 1]. An empty ``data`` collapses to 0.0
+    (degenerate: all bands equal the point forecast).
+    """
+    if not data:
+        return 0.0
+    s = sorted(float(v) for v in data)
+    n = len(s)
+    if n == 1:
+        return s[0]
+    rank = q * (n - 1)
+    lo = int(math.floor(rank))
+    hi = int(math.ceil(rank))
+    if lo == hi:
+        return s[lo]
+    frac = rank - lo
+    return s[lo] + (s[hi] - s[lo]) * frac
+
+
+def _quantile_series(
+    point_series: List[float], residuals: List[float]
+) -> Dict[str, Any]:
+    """Build monotone quantile bands around a point forecast.
+
+    ``point_series`` is the per-step point forecast (length ``horizon``);
+    ``residuals`` are the in-sample residuals of the baseline. For each level
+    ``l`` in ``QUANTILE_LEVELS`` the quantile band is
+    ``point_series + quantile(residuals, l)``. The 9 bands are then sorted
+    ascending per step and re-assigned to levels 0.1..0.9, which guarantees
+    ``q_0.1 <= … <= q_0.9`` by construction. The point forecast returned is
+    the ``q_0.5`` band (median consistency).
+
+    Returns ``(forecasts, quantiles)`` where ``forecasts`` is the ``q_0.5``
+    series and ``quantiles`` maps level strings ("0.1".."0.9") to a per-step
+    list of length ``horizon``.
+    """
+    levels = [str(l) for l in QUANTILE_LEVELS]
+    if not residuals:
+        # Degenerate case (e.g. single-point context): no empirical residual
+        # information, so all quantiles collapse onto the point forecast.
+        residuals = [0.0]
+    pt = [float(v) for v in point_series]
+    q_vals = {l: [p + _percentile(residuals, float(l)) for p in pt] for l in levels}
+    # Enforce monotone non-decreasing quantiles per step: for each horizon
+    # step sort the 9 band values ascending and re-assign to levels 0.1..0.9.
+    horizon = len(pt)
+    quantiles: Dict[str, List[float]] = {l: [0.0] * horizon for l in levels}
+    for h in range(horizon):
+        step_vals = sorted(q_vals[l][h] for l in levels)
+        for i, l in enumerate(levels):
+            quantiles[l][h] = step_vals[i]
+    forecasts = quantiles["0.5"]
+    return forecasts, quantiles
+
 
 class NaiveForecastModel:
-    def predict(self, history: Union[List[float], List[List[float]]], horizon=1) -> Union[List[float], List[List[float]]]:
+    """Naive (last-value) baseline with empirical-residual quantile bands.
+
+    The point forecast is the last observed value for every horizon step
+    (pooled across steps). Residuals are the one-step naive residuals
+    ``series[t] - series[t-1]`` over the context window; the same pooled
+    residual distribution is used for every horizon step (the naive forecast
+    assumes the residual distribution is stationary in the prediction window).
+    """
+
+    def predict(
+        self, history: Union[List[float], List[List[float]]], horizon: int = 1
+    ) -> Dict[str, Any]:
         if not history:
-            raise ValueError("Historie darf nicht leer sein.")
-        
-        is_single_series = not history or not isinstance(history[0], list)
-        
-        if is_single_series:
-            # Type assertion to satisfy the type checker
-            history_single = history
-            if not history_single:
-                 return [0] * horizon
-            last_value = history_single[-1]
-            return [last_value] * horizon
-        
-        # It's a batch
-        history_batch = history
-        predictions = []
-        for series in history_batch:
-            if not series:
-                predictions.append([0] * horizon)
-            else:
-                last_value = series[-1]
-                predictions.append([last_value] * horizon)
-        return predictions
+            raise ValueError("History must not be empty.")
+
+        is_batch = isinstance(history[0], list)
+
+        if is_batch:
+            all_forecasts: List[List[float]] = []
+            all_quantiles: List[Dict[str, List[float]]] = []
+            for series in history:
+                if not series:
+                    raise ValueError("History series must not be empty.")
+                f, q = self._predict_single(series, horizon)
+                all_forecasts.append(f)
+                all_quantiles.append(q)
+            return {"forecasts": all_forecasts, "quantiles": all_quantiles}
+
+        forecasts, quantiles = self._predict_single(history, horizon)
+        return {"forecasts": forecasts, "quantiles": quantiles}
+
+    def _predict_single(
+        self, series: List[float], horizon: int
+    ) -> Dict[str, Any]:
+        last_value = float(series[-1])
+        point_series = [last_value] * horizon
+        residuals = [
+            float(series[t]) - float(series[t - 1]) for t in range(1, len(series))
+        ]
+        return _quantile_series(point_series, residuals)
