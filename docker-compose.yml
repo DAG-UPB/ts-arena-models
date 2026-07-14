@@ -5,7 +5,7 @@ services:
     build: ./master-controller
     command: uvicorn api:app --host 0.0.0.0 --port 8000
     ports:
-      - "8456:8000"
+      - "${MASTER_API_PORT:-8456}:8000"
     environment:
       - DOCKER_HOST=http://docker-proxy:2375
       - TARGET_LABEL=managed.by=controller
@@ -28,6 +28,7 @@ services:
       - NETWORKS=0
       - VOLUMES=0
       - POST=1
+      - LOG_LEVEL=info
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -68,10 +69,11 @@ include:
   - compose/visionts.yml
   - compose/flowstate.yml
   - compose/tinytimemixer.yml
+  - compose/tabpfn-ts.yml
+  - compose/toto.yml
 
 volumes:
   arena-db:
-
 
 networks:
   default:

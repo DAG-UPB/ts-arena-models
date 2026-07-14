@@ -4,9 +4,15 @@ from typing import List, Dict, Union, Any
 import logging
 import os
 
-from tabpfn_time_series import TabPFNTSPipeline, TabPFNMode
+from tabpfn_time_series import (
+    TabPFNTSPipeline,
+    TabPFNMode,
+    DEFAULT_QUANTILE_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
+
+QUANTILE_LEVELS = DEFAULT_QUANTILE_CONFIG  # [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 
 class TabPFNTSModel:
@@ -18,8 +24,8 @@ class TabPFNTSModel:
 
         logger.info("Loading TabPFN-TS pipeline in local mode...")
         self.pipeline = TabPFNTSPipeline(
-            tabpfn_mode=TabPFNMode.LOCAL,
             max_context_length=max_context_length,
+            tabpfn_mode=TabPFNMode.LOCAL,
         )
         logger.info("TabPFN-TS pipeline loaded successfully")
 
@@ -28,9 +34,6 @@ class TabPFNTSModel:
         data: Union[List[Dict[str, Any]], List[List[Dict[str, Any]]]],
         horizon: int,
         freq: str = "h",
-        past_covariates: Union[None, pd.DataFrame] = None,
-        future_covariates: Union[None, pd.DataFrame] = None,
-        quantile_levels: List[float] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     ) -> Dict[str, Any]:
         """
         Run forecasting with TabPFN-TS pipeline.
@@ -40,7 +43,6 @@ class TabPFNTSModel:
                   or a batch of time series as a list of such lists.
             horizon: Number of forecast steps (prediction_length).
             freq: Pandas frequency string, e.g. "h", "D", "1min".
-            quantile_levels: List of quantile levels for probabilistic forecasting.
 
         Returns:
             Dictionary with:
@@ -58,66 +60,71 @@ class TabPFNTSModel:
         else:
             data_as_batch = [data]
 
-        # Build a combined context DataFrame with item_id, timestamp, target
-        all_rows = []
+        # Predict each series individually to avoid cross-series interference in the combined DataFrame (batching corrupts predictions).
+        all_forecasts = []
+        all_quantiles = {}
+
         for idx, series_data in enumerate(data_as_batch):
-            item_id = f"series_{idx}"
-            for item in series_data:
-                all_rows.append(
-                    {
-                        "item_id": item_id,
-                        "timestamp": pd.Timestamp(item["ts"]),
-                        "target": float(item["value"]),
-                    }
+            rows = [
+                {
+                    "item_id": f"series_{idx}",
+                    "timestamp": pd.Timestamp(item["ts"]),
+                    "target": float(item["value"]),
+                }
+                for item in series_data
+            ]
+            context_df = pd.DataFrame(rows)
+            context_df["timestamp"] = pd.to_datetime(
+                context_df["timestamp"], utc=True
+            ).dt.tz_localize(None)
+
+            # Fill timestamp gaps so freq is always inferrable. Any gap in the series makes TimeSeriesDataFrame.freq return None, which crashes predict_df
+            # Reindex onto a complete date_range using the known freq; gaps become NaN and are handled internally.
+            context_df = context_df.set_index("timestamp")
+            complete_index = pd.date_range(
+                start=context_df.index.min(),
+                end=context_df.index.max(),
+                freq=freq,
+            )
+            context_df = (
+                context_df.reindex(complete_index)
+                .rename_axis("timestamp")
+                .reset_index()
+            )
+            context_df["item_id"] = f"series_{idx}"
+            n_gaps = context_df["target"].isna().sum()
+            if n_gaps:
+                logger.warning(
+                    f"Series {idx}: {n_gaps} timestamp gap(s) detected and filled with NaN."
                 )
 
-        context_df = pd.DataFrame(all_rows)
-        # Ensure timestamp column is timezone-naive datetime64 (required by TabPFN-TS TimeSeriesDataFrame)
-        context_df["timestamp"] = pd.to_datetime(context_df["timestamp"], utc=True).dt.tz_localize(None)
+            try:
+                pred_df = self.pipeline.predict_df(
+                    context_df,
+                    prediction_length=horizon,
+                    quantiles=QUANTILE_LEVELS,
+                )
+            except Exception as e:
+                logger.error(
+                    f"TabPFN-TS prediction failed for series {idx}: {e}",
+                    exc_info=True,
+                )
+                raise
 
-        # Run prediction via predict_df
-        try:
-            pred_df = self.pipeline.predict_df(
-                context_df=context_df,
-                prediction_length=horizon,
-                quantiles=quantile_levels,
-            )
-        except Exception as e:
-            logger.error(f"TabPFN-TS prediction failed: {e}", exc_info=True)
-            raise
-
-        # Parse results back into the expected format
-        if is_batch:
-            all_forecasts = []
-            all_quantiles = {}
-
-            for idx, series_data in enumerate(data_as_batch):
-                item_id = f"series_{idx}"
-                # pred_df is indexed by (item_id, timestamp)
-                item_pred = pred_df.loc[item_id]
-
-                # Point forecasts from 'target' column
-                forecasts = item_pred["target"].tolist()
-                all_forecasts.append(forecasts)
-
-                # Quantiles: 0.1, 0.2, ...
-                quantile_dict = {}
-                for q in quantile_levels:
-                    if q in item_pred.columns:
-                        quantile_dict[str(q)] = item_pred[q].tolist()
-                all_quantiles[idx] = quantile_dict
-
-            return {"forecasts": all_forecasts, "quantiles": all_quantiles}
-        else:
-            # Single series
-            # pred_df may have a dummy item_id level
             if isinstance(pred_df.index, pd.MultiIndex):
                 pred_df = pred_df.droplevel(0)
 
-            forecasts = pred_df["target"].tolist()
+            all_forecasts.append(pred_df["target"].tolist())
             quantile_dict = {}
-            for q in quantile_levels:
+            for q in QUANTILE_LEVELS:
                 if q in pred_df.columns:
                     quantile_dict[str(q)] = pred_df[q].tolist()
+            all_quantiles[idx] = quantile_dict
 
-            return {"forecasts": forecasts, "quantiles": quantile_dict}
+        if is_batch:
+            return {"forecasts": all_forecasts, "quantiles": all_quantiles}
+        else:
+            return {
+                "forecasts": all_forecasts[0],
+                "quantiles": all_quantiles[0],
+            }

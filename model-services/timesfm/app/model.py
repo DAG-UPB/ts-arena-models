@@ -29,7 +29,7 @@ class TimesFMModel:
         elif "1.0-200m" in self.model_id:
             num_layers = 20
             context_len = 512
-            use_pos_emb = Trues
+            use_pos_emb = True
         else:
             print(f"Warning: Unknown model ID {self.model_id}, using default parameters for 2.0-500m")
             num_layers = 50

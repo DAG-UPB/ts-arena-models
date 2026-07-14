@@ -426,14 +426,19 @@ def upload_forecasts(round_id: int, model_name: str, forecasts: List[Dict[str, A
 
 
 # --- Main ---
-def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]]):
-    """Process a single challenge round"""
+def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]]) -> bool:
+    """Process a single challenge round.
+    
+    Returns True if the challenge was fully processed (or permanently
+    skipped), False if it should be retried later (e.g. context data
+    not yet available).
+    """
     round_id = challenge.get("id")
     challenge_name = challenge.get("name", "Unknown")
     
     if not round_id:
         logger.warning("Skipped challenge without ID")
-        return
+        return True
     
     logger.info(f"Processing challenge round {round_id}: {challenge_name}")
     
@@ -443,7 +448,7 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     
     if not frequency_str or not horizon_str:
         logger.warning(f"Challenge round {round_id} missing frequency or horizon")
-        return
+        return True
     
     frequency_delta = parse_frequency(frequency_str)
     horizon_steps = parse_horizon(horizon_str, frequency_delta)
@@ -454,14 +459,14 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     # Fetch context data
     context_data = get_context_data(str(round_id))
     if not context_data:
-        logger.warning(f"No context data for round {round_id}")
-        return
+        logger.warning(f"No context data for round {round_id} – will retry in next iteration")
+        return False
     
     # Extract history in HistoryItem format
     histories, series_names, max_timestamps = extract_history_from_context(context_data)
     if not histories:
-        logger.warning(f"No usable history data for round {round_id}")
-        return
+        logger.warning(f"No usable history data for round {round_id} – will retry in next iteration")
+        return False
     
     logger.info(f"  {len(histories)} series found")
     
@@ -525,6 +530,8 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
                               "FAILURE", f"{str(e)}\n{error_details}",
                               duration_s=duration_s)
 
+    return True
+
 
 def main_loop():
     """Main loop: Check regularly for new challenges"""
@@ -567,8 +574,11 @@ def main_loop():
                 
                 # Process challenge
                 try:
-                    process_challenge(challenge, active_models)
-                    processed_challenges.add(round_id)
+                    completed = process_challenge(challenge, active_models)
+                    if completed:
+                        processed_challenges.add(round_id)
+                    else:
+                        logger.info(f"Round {round_id} not yet ready – will retry in next iteration")
                 except Exception as e:
                     logger.error(f"Error processing round {round_id}: {e}")
             

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Pydantic models
 class HistoryItem(BaseModel):
     ts: str
-    value: float
+    value: Optional[float] = None
 
 class PredictionRequest(BaseModel):
     history: Union[List[List[HistoryItem]], List[HistoryItem]]
