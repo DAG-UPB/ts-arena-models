@@ -11,6 +11,26 @@ from uni2ts.model.moirai_moe import MoiraiMoEForecast, MoiraiMoEModule
 from uni2ts.model.moirai2 import Moirai2Forecast, Moirai2Module  # Moirai 2.0[web:23]
 
 
+QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+
+def _enforce_monotonicity(quantile_dict: Dict[str, List[float]], levels: List[float]) -> Dict[str, List[float]]:
+    """Sort the 9 quantile values ascending per forecast step and re-assign to
+    levels 0.1..0.9 so q_0.1 <= ... <= q_0.9. Sample-based models (moirai v1,
+    sundial) can produce crossing tail deciles due to Monte-Carlo noise; this
+    guarantees a valid (non-crossing) quantile distribution."""
+    level_strs = [str(l) for l in levels]
+    if not all(k in quantile_dict for k in level_strs):
+        return quantile_dict
+    horizon = len(quantile_dict[level_strs[0]])
+    for h in range(horizon):
+        vals = [quantile_dict[str(l)][h] for l in levels]
+        vals.sort()
+        for j, l in enumerate(levels):
+            quantile_dict[str(l)][h] = vals[j]
+    return quantile_dict
+
+
 def _infer_family_from_model_id(model_id: str) -> str:
     """
     Infer the Moirai model family from the full Hugging Face model ID.
@@ -211,7 +231,7 @@ class MoiraiModel:
             forecasts = list(predictor.predict(ds))
             
             forecast_obj = forecasts[0]
-            
+
             if self.family == "moirai2":
                 quantile_dict = {}
                 for q in quantile_levels:
@@ -219,9 +239,9 @@ class MoiraiModel:
                     if q_key in forecast_obj.forecast_keys:
                         q_values = forecast_obj.quantile(q_key).tolist()
                     else:
-                        # Interpolate if requested quantile not in native set
                         q_values = forecast_obj.quantile(q).tolist()
                     quantile_dict[q_key] = q_values
+                quantile_dict = _enforce_monotonicity(quantile_dict, quantile_levels)
                 all_quantiles.append(quantile_dict)
                 all_forecasts.append(quantile_dict['0.5'])
             else:
@@ -230,6 +250,7 @@ class MoiraiModel:
                 for q in quantile_levels:
                     q_values = np.quantile(samples, q, axis=0).tolist()
                     quantile_dict[str(q)] = q_values
+                quantile_dict = _enforce_monotonicity(quantile_dict, quantile_levels)
                 all_quantiles.append(quantile_dict)
                 all_forecasts.append(quantile_dict['0.5'])
 

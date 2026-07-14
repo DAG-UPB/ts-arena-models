@@ -7,6 +7,25 @@ from typing import List, Union, Optional, cast, Dict, Any
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 
+
+def _enforce_monotonicity(
+    quantile_dict: Dict[str, List[float]], levels: List[float]
+) -> Dict[str, List[float]]:
+    """Sort the 9 quantile values ascending per forecast step and re-assign to
+    levels 0.1..0.9 so q_0.1 <= ... <= q_0.9. Sample-based models can produce
+    crossing tail deciles due to Monte-Carlo noise; this guarantees a valid
+    (non-crossing) quantile distribution."""
+    level_strs = [str(l) for l in levels]
+    if not all(k in quantile_dict for k in level_strs):
+        return quantile_dict
+    horizon = len(quantile_dict[level_strs[0]])
+    for h in range(horizon):
+        vals = [quantile_dict[str(l)][h] for l in levels]
+        vals.sort()
+        for j, l in enumerate(levels):
+            quantile_dict[str(l)][h] = vals[j]
+    return quantile_dict
+
 class SundialModel:
     def __init__(self) -> None:
         self.device = torch.device(device)
@@ -88,6 +107,7 @@ class SundialModel:
                 for q in quantile_levels:
                     q_values = np.quantile(samples, q, axis=0).tolist()
                     quantile_dict[str(q)] = q_values
+                quantile_dict = _enforce_monotonicity(quantile_dict, quantile_levels)
                 all_quantiles.append(quantile_dict)
         else:
             # Batch processing for sequences with same length
@@ -121,6 +141,7 @@ class SundialModel:
                 for q in quantile_levels:
                     q_values = np.quantile(series_samples, q, axis=0).tolist()
                     quantile_dict[str(q)] = q_values
+                quantile_dict = _enforce_monotonicity(quantile_dict, quantile_levels)
                 all_quantiles.append(quantile_dict)
 
         # Return structured output
