@@ -66,6 +66,7 @@ include:
   - compose/statistical.yml
   - compose/neuralforecast.yml
   - compose/tirex.yml
+  - compose/tirex-2.yml
   - compose/visionts.yml
   - compose/flowstate.yml
   - compose/tinytimemixer.yml

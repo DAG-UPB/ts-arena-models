@@ -1,0 +1,17 @@
+services:
+  tirex-2:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tirex-2
+    build:
+      context: ../model-services/tirex-2
+      dockerfile: Dockerfile
+    profiles: ["tirex-2", "all-models"]
+    environment:
+      - MODEL_ID=NX-AI/TiRex-2
+      # NX-AI/TiRex-2 is a gated HF repo: needs a read token whose account accepted the terms
+      - HF_TOKEN=${HF_READ_TOKEN:-}
+      # The cuda 12.8 devel base image requires driver >=570 via NVIDIA_REQUIRE_CUDA;
+      # CUDA 12.x user-space runs on the host's 535 driver via minor-version compatibility
+      - NVIDIA_DISABLE_REQUIRE=1
