@@ -363,6 +363,20 @@
         },
         "organization_id": 7
     },
+    "tirex-2": {
+        "name": "NX-AI/TiRex-2",
+        "model_type": "TSFM",
+        "model_family": "tirex",
+        "model_size": 83,
+        "hosting": "UPB",
+        "architecture": "xLSTM",
+        "pretraining_data": "Chronos datasets, LOTSA and synthetic data",
+        "publishing_date": "2026-07-01",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 8
+    },
     "tirex": {
         "name": "NX-AI/TiRex",
         "model_type": "TSFM",
