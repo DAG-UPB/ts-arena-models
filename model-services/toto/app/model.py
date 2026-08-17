@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import numpy as np
 import os
 from typing import List, Union, Dict, Any
@@ -25,7 +29,7 @@ class TotoModel:
         Initializes the Toto model from HuggingFace.
         Uses the Toto-Open-Base-1.0 checkpoint.
         """
-        print("Initializing Toto model...")
+        logger.info("Initializing Toto model...")
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
@@ -37,7 +41,7 @@ class TotoModel:
         # Create forecaster
         self.forecaster = TotoForecaster(self.toto.model)
         
-        print(f"Toto initialized (device={self.device})")
+        logger.info(f"Toto initialized (device={self.device})")
 
     def predict(
         self,

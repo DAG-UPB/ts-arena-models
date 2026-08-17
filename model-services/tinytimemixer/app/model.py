@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import numpy as np
 from typing import List, Union, Dict, Any
@@ -6,7 +10,7 @@ import os
 from tsfm_public.toolkit.get_model import get_model
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 class TinyTimeMixerModel:
@@ -22,8 +26,8 @@ class TinyTimeMixerModel:
         self.context_length = int(os.getenv("TTM_CONTEXT_LENGTH", "512"))
         self.prediction_length = int(os.getenv("TTM_PREDICTION_LENGTH", "96"))
         
-        print(f"Loading TinyTimeMixer model: {model_id}")
-        print(f"Context length: {self.context_length}, Prediction length: {self.prediction_length}")
+        logger.info(f"Loading TinyTimeMixer model: {model_id}")
+        logger.info(f"Context length: {self.context_length}, Prediction length: {self.prediction_length}")
         
         # Use get_model for automatic model selection
         self.model = get_model(
@@ -34,7 +38,7 @@ class TinyTimeMixerModel:
         self.model = self.model.to(device)
         self.model.eval()
         
-        print("TinyTimeMixer model loaded successfully")
+        logger.info("TinyTimeMixer model loaded successfully")
 
     def predict(
         self,

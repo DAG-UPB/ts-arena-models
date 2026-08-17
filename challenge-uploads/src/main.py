@@ -17,11 +17,28 @@ import isodate
 load_dotenv()
 time.sleep(2)
 
-LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+# ts-arena #15: `basicConfig(level="info")` raises ValueError -- the obvious
+# lowercase spelling of a documented operator knob used to take the service down
+# at import. Resolve the level defensively, exactly as ts-arena-backend's
+# logging_setup.py does, and never raise.
+_LOG_LEVELS = {"CRITICAL": logging.CRITICAL, "FATAL": logging.CRITICAL,
+               "ERROR": logging.ERROR, "WARNING": logging.WARNING,
+               "WARN": logging.WARNING, "INFO": logging.INFO,
+               "DEBUG": logging.DEBUG}
+LOG_LEVEL = _LOG_LEVELS.get(os.environ.get("LOG_LEVEL", "").strip().upper(), logging.INFO)
 LOG_DIR = os.environ.get("LOG_DIR", "/app/logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-_log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+
+class _UTCFormatter(logging.Formatter):
+    """Formatter whose %(asctime)s is UTC rather than local container time."""
+
+    converter = time.gmtime
+
+
+# Format matches the rest of the fleet (ts-arena-backend logging_setup.py): the
+# old one carried no logger name and rendered local time with no zone marker.
+_log_formatter = _UTCFormatter("%(asctime)sZ | %(levelname)s | %(name)s | %(message)s")
 
 # Console handler (existing behaviour)
 _console_handler = logging.StreamHandler()
@@ -37,7 +54,8 @@ _file_handler = logging.handlers.TimedRotatingFileHandler(
 )
 _file_handler.setFormatter(_log_formatter)
 
-logging.basicConfig(level=LOG_LEVEL, handlers=[_console_handler, _file_handler])
+logging.basicConfig(level=LOG_LEVEL, handlers=[_console_handler, _file_handler], force=True)
+logging.getLogger("urllib3").setLevel(max(logging.WARNING, LOG_LEVEL))
 logger = logging.getLogger(__name__)
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8457")
@@ -205,23 +223,29 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
     Returns: List of (container_name, api_model_name)
     """
     resolved = []
-    
+    unmatched = []
+
     # Create lookup for registered models by name
     reg_lookup = {m.get("name"): m for m in registered_models}
-    
+
     for container_name, conf_data in config.items():
         conf_model_name = conf_data.get("name")
-        logger.info(f"Resolving model for container '{container_name}': {conf_model_name}")
+        logger.debug(f"Resolving model for container '{container_name}': {conf_model_name}")
         if not conf_model_name:
             continue
-            
+
         if container_name in reg_lookup:
             # Match found
             resolved.append((container_name, conf_model_name))
-            logger.info(f"Model matched: Container '{container_name}' -> API Name '{conf_model_name}'")
+            logger.debug(f"Model matched: Container '{container_name}' -> API Name '{conf_model_name}'")
         else:
-            logger.warning(f"Model from config '{container_name}' ({conf_model_name}) not found in API")
-            
+            unmatched.append(f"{container_name} ({conf_model_name})")
+
+    # ts-arena #15: one counted line instead of one warning per unmatched model.
+    if unmatched:
+        logger.warning(f"{len(unmatched)} model(s) from config not found in API: "
+                       + ", ".join(unmatched))
+
     return resolved
 
 
@@ -426,50 +450,61 @@ def upload_forecasts(round_id: int, model_name: str, forecasts: List[Dict[str, A
 
 
 # --- Main ---
-def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]]) -> bool:
+def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]],
+                      retry: int = 0) -> bool:
     """Process a single challenge round.
-    
+
     Returns True if the challenge was fully processed (or permanently
     skipped), False if it should be retried later (e.g. context data
     not yet available).
+
+    `retry` is how many times this round has already come back not-ready. It is a
+    logging knob only (ts-arena #15): the round preamble and the "not ready" line
+    are worth one INFO the first time and nothing but DEBUG on every 60 s repeat
+    after that. The retry itself is intended behaviour, not a bug -- the round is
+    deliberately kept out of `processed_challenges` until its context data exists.
     """
     round_id = challenge.get("id")
     challenge_name = challenge.get("name", "Unknown")
-    
+
+    # First look at this round gets the full preamble; the repeats go to DEBUG.
+    detail = logger.info if retry == 0 else logger.debug
+    not_ready = logger.warning if retry == 0 else logger.debug
+
     if not round_id:
         logger.warning("Skipped challenge without ID")
         return True
-    
-    logger.info(f"Processing challenge round {round_id}: {challenge_name}")
-    
+
+    detail(f"Processing challenge round {round_id}: {challenge_name}")
+
     # Extract frequency and horizon (expected in the rounds response)
     frequency_str = challenge.get("frequency")
     horizon_str = challenge.get("horizon")
-    
+
     if not frequency_str or not horizon_str:
         logger.warning(f"Challenge round {round_id} missing frequency or horizon")
         return True
-    
+
     frequency_delta = parse_frequency(frequency_str)
     horizon_steps = parse_horizon(horizon_str, frequency_delta)
-    
-    logger.info(f"  Frequency: {frequency_str} -> {frequency_delta}")
-    logger.info(f"  Horizon: {horizon_str} -> {horizon_steps} steps")
-    
+
+    detail(f"  Frequency: {frequency_str} -> {frequency_delta}")
+    detail(f"  Horizon: {horizon_str} -> {horizon_steps} steps")
+
     # Fetch context data
     context_data = get_context_data(str(round_id))
     if not context_data:
-        logger.warning(f"No context data for round {round_id} – will retry in next iteration")
+        not_ready(f"No context data for round {round_id} – will retry in next iteration")
         return False
-    
+
     # Extract history in HistoryItem format
     histories, series_names, max_timestamps = extract_history_from_context(context_data)
     if not histories:
-        logger.warning(f"No usable history data for round {round_id} – will retry in next iteration")
+        not_ready(f"No usable history data for round {round_id} – will retry in next iteration")
         return False
-    
+
     logger.info(f"  {len(histories)} series found")
-    
+
     # Convert frequency to model format
     freq_mapping = {
         "1 minute": "1min", "15 minutes": "15min", "30 minutes": "30min",
@@ -546,46 +581,66 @@ def main_loop():
     # Model initialization
     config = load_config()
     registered_models = fetch_registered_models()
-    logger.info(f"Registered models: {registered_models}")
+    logger.info(f"Registered models: {len(registered_models)} "
+                f"({', '.join(sorted(str(m.get('name')) for m in registered_models)) or 'none'})")
     active_models = resolve_models(config, registered_models)
-    
+
     if not active_models:
         logger.warning("No active models found. Check config and API.")
     else:
-        logger.info(f"Active models: {len(active_models)}")
-        for container, api_name in active_models:
-            logger.info(f"  - {container} -> {api_name}")
-    
+        logger.info(f"Active models: {len(active_models)} – "
+                    + ", ".join(f"{c} -> {n}" for c, n in active_models))
+
     processed_challenges = set()
-    
+    # ts-arena #15: rounds that are not ready yet are deliberately re-tried every
+    # CHECK_INTERVAL, but they used to re-emit the whole preamble each time. Count
+    # the retries so the repeats can drop to DEBUG and the wait is reported once.
+    pending_retries: Dict[Any, int] = {}
+    last_challenge_count = None
+
     while True:
         try:
             # Fetch all challenges
             challenges = get_all_challenges()
-            logger.info(f"Found challenges: {len(challenges)}")
-            
+            if len(challenges) != last_challenge_count:
+                logger.info(f"Found challenges: {len(challenges)}")
+                last_challenge_count = len(challenges)
+            else:
+                logger.debug(f"Found challenges: {len(challenges)} (unchanged)")
+
             for challenge in challenges:
                 round_id = challenge.get("id")
-                
+
                 # Check if already processed
                 if round_id in processed_challenges:
                     logger.debug(f"Round {round_id} already processed, skipping")
                     continue
-                
+
                 # Process challenge
+                retry = pending_retries.get(round_id, 0)
                 try:
-                    completed = process_challenge(challenge, active_models)
+                    completed = process_challenge(challenge, active_models, retry=retry)
                     if completed:
                         processed_challenges.add(round_id)
+                        if pending_retries.pop(round_id, 0):
+                            logger.info(
+                                f"Round {round_id} became ready after {retry} retries "
+                                f"(~{retry * CHECK_INTERVAL}s wait)"
+                            )
                     else:
-                        logger.info(f"Round {round_id} not yet ready – will retry in next iteration")
+                        pending_retries[round_id] = retry + 1
+                        if retry == 0:
+                            logger.info(
+                                f"Round {round_id} not ready yet – retrying silently every "
+                                f"{CHECK_INTERVAL}s (set LOG_LEVEL=DEBUG to see each attempt)"
+                            )
                 except Exception as e:
                     logger.error(f"Error processing round {round_id}: {e}")
-            
+
             # Wait for next check
-            logger.info(f"Waiting {CHECK_INTERVAL}s for next check...")
+            logger.debug(f"Waiting {CHECK_INTERVAL}s for next check...")
             time.sleep(CHECK_INTERVAL)
-            
+
         except KeyboardInterrupt:
             logger.info("Service stopping...")
             break

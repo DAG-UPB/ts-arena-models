@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import numpy as np
 from typing import List, Union, Dict, Any
@@ -6,7 +10,7 @@ import os
 from tsfm_public import FlowStateForPrediction
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 # Scale factor mapping for common frequencies
@@ -35,13 +39,13 @@ class FlowstateModel:
         """
         model_id = os.getenv("MODEL_ID", "ibm-research/flowstate")
         
-        print(f"Loading FlowState model: {model_id}")
+        logger.info(f"Loading FlowState model: {model_id}")
         
         self.model = FlowStateForPrediction.from_pretrained(model_id)
         self.model = self.model.to(device)
         self.model.eval()
         
-        print("FlowState model loaded successfully")
+        logger.info("FlowState model loaded successfully")
 
     def _get_scale_factor(self, freq: str) -> float:
         """Get scale factor for given frequency."""

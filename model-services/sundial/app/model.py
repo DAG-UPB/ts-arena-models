@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import os
 import numpy as np
@@ -5,7 +9,7 @@ from transformers import AutoModelForCausalLM
 from typing import List, Union, Optional, cast, Dict, Any
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 def _enforce_monotonicity(
