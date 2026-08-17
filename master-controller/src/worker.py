@@ -1,11 +1,16 @@
 import os
 import time
 import logging
+from collections import Counter
+
 import httpx
 import docker
 
-# Configure logging for clean output
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from config import setup_logging
+
+# ts-arena #15: one place configures the root logger and it honours LOG_LEVEL.
+setup_logging()
+logger = logging.getLogger(__name__)
 
 TARGET_LABEL = os.environ.get("TARGET_LABEL", "managed.by=controller")
 
@@ -51,45 +56,73 @@ class Worker:
 
     def start(self):
         """Starts the worker container and waits until it is operational (healthy)."""
-        logging.info(f"Starting container '{self.service_name}'...")
-        logging.info(f"Available containers: {[c.name for c in client.containers.list(all=True)]}")
         # Find the container by name (assuming container name matches service_name)
         try:
             self.container = client.containers.get(self.service_name)
         except docker.errors.NotFound:
-            logging.error(f"Container '{self.service_name}' not found.")
+            # The full container list is only worth printing when the lookup failed;
+            # it used to be dumped at INFO on every single start().
+            logger.error(
+                f"Container '{self.service_name}' not found. Containers on this host: "
+                f"{[c.name for c in client.containers.list(all=True)]}"
+            )
             raise RuntimeError(f"Container '{self.service_name}' not found.")
 
         if self.container.status != "running":
             self.container.start()
 
-        logging.info(f"Waiting for container '{self.service_name}' to be reachable at {self.base_url}:{self.port}...")
-
-        # Query a /health endpoint
         health_url = f"{self.base_url}:{self.port}/health"
+        logger.info(
+            f"Starting container '{self.service_name}'; waiting for {health_url} "
+            f"(timeout {self.timeout:g}s)"
+        )
+
+        # ts-arena #15: this loop used to emit one WARNING per second, each carrying
+        # the full response body, for up to `timeout` seconds -- up to ~300 lines to
+        # say "still booting", which is the normal case. Aggregate instead (the
+        # backend #69 pattern): announce the wait once above, report the outcome
+        # once below, and carry the counts so a failure is still diagnosable.
         start_time = time.time()
+        probes = 0
+        statuses = Counter()
+        connect_errors = 0
+        last_body = ""
 
         while time.time() - start_time < self.timeout:
             try:
-                # Try to reach the health endpoint
+                probes += 1
                 response = httpx.get(health_url, timeout=20)
                 if response.status_code == 200:
-                    logging.info(f"Container '{self.service_name}' is ready and responding on {health_url}.")
+                    logger.info(
+                        f"Container '{self.service_name}' ready after "
+                        f"{time.time() - start_time:.1f}s ({probes} health probe(s))"
+                    )
                     return
-                else:
-                    logging.warning(f"Container '{self.service_name}' health check failed with status {response.status_code}: {response.text}. Retrying...")
-                    time.sleep(1)  
+
+                statuses[response.status_code] += 1
+                last_body = response.text[:500]
+                time.sleep(1)
 
             except httpx.RequestError:
-                # Normal while starting
+                # Normal while starting: the container is not accepting connections yet.
+                connect_errors += 1
                 time.sleep(1)
             except Exception as e:
-                logging.error(f"An unexpected error occurred while waiting for container '{self.service_name}': {e}")
+                logger.error(
+                    f"Unexpected error while waiting for container '{self.service_name}' "
+                    f"after {probes} probe(s): {e}"
+                )
                 self.stop()
                 raise
 
-        # Timeout
-        logging.error(f"Container '{self.service_name}' was not reachable after {self.timeout} seconds.")
+        elapsed = time.time() - start_time
+        status_summary = ", ".join(f"{code}x{count}" for code, count in sorted(statuses.items()))
+        logger.error(
+            f"Container '{self.service_name}' was not reachable after {elapsed:.1f}s: "
+            f"{probes} probe(s), {connect_errors} connection error(s), "
+            f"statuses [{status_summary or 'none'}]"
+            + (f", last body: {last_body}" if last_body else "")
+        )
         self.stop()
         raise RuntimeError(f"Timeout waiting for container '{self.service_name}'.")
 
@@ -99,17 +132,17 @@ class Worker:
             try:
                 self.container = client.containers.get(self.service_name)
             except docker.errors.NotFound:
-                logging.info(f"Container '{self.service_name}' not found, nothing to stop.")
+                logger.info(f"Container '{self.service_name}' not found, nothing to stop.")
                 return
 
         if self.container:
             self.container.reload()
             if self.container.status == "running":
-                logging.info(f"Stopping container '{self.service_name}'...")
+                logger.info(f"Stopping container '{self.service_name}'...")
                 self.container.stop(timeout=10)
-                logging.info(f"Container '{self.service_name}' stopped.")
+                logger.info(f"Container '{self.service_name}' stopped.")
             else:
-                logging.info(f"Container '{self.service_name}' is not running.")
+                logger.info(f"Container '{self.service_name}' is not running.")
 
     def predict(self, data=None):
         """
@@ -122,7 +155,7 @@ class Worker:
         Returns:
             The JSON response from the worker.
         """
-        logging.info(f"Requesting prediction from '{self.service_name}'...")
+        logger.info(f"Requesting prediction from '{self.service_name}'...")
         try:
             if data is None:
                 response = httpx.get(self.predict_url, timeout=self.timeout)
@@ -131,10 +164,10 @@ class Worker:
 
             response.raise_for_status()
             prediction = response.json()
-            logging.info(f"Prediction from '{self.service_name}' received.")
+            logger.info(f"Prediction from '{self.service_name}' received.")
             return prediction
         except httpx.RequestError as e:
-            logging.error(f"HTTP request to '{self.service_name}' failed: {e}")
+            logger.error(f"HTTP request to '{self.service_name}' failed: {e}")
             raise
 
 
@@ -148,7 +181,7 @@ def ensure_started():
     for c in list_targets():
         c.reload()
         if c.status != "running":
-            logging.info(f"Starting container '{c.name}'...")
+            logger.info(f"Starting container '{c.name}'...")
             c.start()
 
 
@@ -169,7 +202,7 @@ def ensure_stopped(timeout=10):
     for c in list_targets():
         c.reload()
         if c.status == "running":
-            logging.info(f"Stopping container '{c.name}'...")
+            logger.info(f"Stopping container '{c.name}'...")
             c.stop(timeout=timeout)
 
 

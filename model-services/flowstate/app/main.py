@@ -1,14 +1,39 @@
 from __future__ import annotations
 
+# --- logging (ts-arena #15) ---------------------------------------------
+# Configure the ROOT logger, not just this module's. Left unconfigured, root keeps
+# its default level WARNING with no handler at all: every logger.info() below is
+# dropped before the record is even built, and WARNING+ escapes through
+# logging.lastResort as bare text with no timestamp, no level and no logger name.
+# That is the defect that hid the ELO job for ten days in backend #75. Format and
+# LOG_LEVEL semantics match ts-arena-backend's logging_setup.py so the whole fleet
+# reads alike. Must stay above the `.model` import, which logs at import time.
+import logging
+import os
+import sys
+import time
+
+_LOG_LEVELS = {"CRITICAL": logging.CRITICAL, "FATAL": logging.CRITICAL,
+               "ERROR": logging.ERROR, "WARNING": logging.WARNING,
+               "WARN": logging.WARNING, "INFO": logging.INFO,
+               "DEBUG": logging.DEBUG}
+logging.Formatter.converter = time.gmtime  # asctime in UTC, hence the trailing Z
+logging.basicConfig(
+    level=_LOG_LEVELS.get(os.getenv("LOG_LEVEL", "").strip().upper(), logging.INFO),
+    format="%(asctime)sZ | %(levelname)s | %(name)s | %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
+# ------------------------------------------------------------------------
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Union, Dict, Optional
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from .model import FlowstateModel
-import logging
 
-logger = logging.getLogger(__name__)
 
 class HistoryItem(BaseModel):
     ts: str

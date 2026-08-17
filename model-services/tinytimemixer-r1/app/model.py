@@ -9,7 +9,7 @@ from tsfm_public.models.tinytimemixer import TinyTimeMixerForPrediction
 logger = logging.getLogger(__name__)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 class TinyTimeMixerR1Model:
@@ -23,8 +23,8 @@ class TinyTimeMixerR1Model:
         self.context_length = int(os.getenv("TTM_R1_CONTEXT_LENGTH", "512"))
         self.prediction_length = int(os.getenv("TTM_R1_PREDICTION_LENGTH", "96"))
         
-        print(f"Loading TinyTimeMixer R1 model: {model_id} (revision: {revision})")
-        print(f"Context length: {self.context_length}, Prediction length: {self.prediction_length}")
+        logger.info(f"Loading TinyTimeMixer R1 model: {model_id} (revision: {revision})")
+        logger.info(f"Context length: {self.context_length}, Prediction length: {self.prediction_length}")
         
         self.model = TinyTimeMixerForPrediction.from_pretrained(
             model_id,
@@ -33,7 +33,7 @@ class TinyTimeMixerR1Model:
         self.model = self.model.to(device)
         self.model.eval()
         
-        print("TinyTimeMixer R1 model loaded successfully")
+        logger.info("TinyTimeMixer R1 model loaded successfully")
 
     def predict(
         self,

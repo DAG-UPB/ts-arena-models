@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 from tirex import load_model, ForecastModel
 import numpy as np
@@ -5,7 +9,7 @@ import os
 from typing import List, Union, Dict, Any
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 class TiRexModel:
@@ -14,10 +18,10 @@ class TiRexModel:
         Initializes the TiRex model from HuggingFace.
         """
         model_id = os.getenv("MODEL_ID", "NX-AI/TiRex")
-        print(f"Loading TiRex model from {model_id}...")
+        logger.info(f"Loading TiRex model from {model_id}...")
         self.model: ForecastModel = load_model(model_id)
         self.model = self.model.to(device)
-        print("TiRex model loaded successfully")
+        logger.info("TiRex model loaded successfully")
 
     def predict(
         self,

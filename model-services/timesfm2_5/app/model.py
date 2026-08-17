@@ -6,8 +6,7 @@ import logging
 from typing import List, Union
 from pathlib import Path
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Root logging is configured once, in app/main.py (ts-arena #15).
 logger = logging.getLogger(__name__)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

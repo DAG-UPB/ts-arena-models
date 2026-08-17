@@ -30,8 +30,8 @@ class VisionTSModel:
         
         ckpt_path = os.path.join(ckpt_dir, checkpoint_name)
         
-        print(f"Loading VisionTS++ model: checkpoint={checkpoint_name}, arch={self.arch}")
-        print(f"Checkpoint path: {ckpt_path}")
+        logger.info(f"Loading VisionTS++ model: checkpoint={checkpoint_name}, arch={self.arch}")
+        logger.info(f"Checkpoint path: {ckpt_path}")
         
         # VisionTS++ with probabilistic forecasting support
         self.model = VisionTSpp(
@@ -46,7 +46,7 @@ class VisionTSModel:
         self.model = self.model.to(device)
         self.model.eval()
         
-        print("VisionTS++ model loaded successfully")
+        logger.info("VisionTS++ model loaded successfully")
 
     def predict(
         self,

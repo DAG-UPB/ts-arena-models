@@ -5,13 +5,16 @@ import math
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Dict
-from worker import Worker, get_available_models
-from config import Config
+from config import Config, setup_logging
 
+# ts-arena #15: configure the root logger before importing anything that logs at
+# import time, and honour Config.LOG_LEVEL instead of hardcoding INFO.
+setup_logging()
+logger = logging.getLogger(__name__)
+
+from worker import Worker, get_available_models
 
 compose_project_name = os.getenv("COMPOSE_PROJECT_NAME", "ts-models")
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 history_example = [
     {"ts": "2026-01-01T00:00:00Z", "value": 10.0},
@@ -66,7 +69,7 @@ async def start_model(request: ModelControlRequest):
     """
     Starts a model container and keeps it running for subsequent requests.
     """
-    logging.info(f"Request to start model '{request.model_name}'")
+    logger.info(f"Request to start model '{request.model_name}'")
     # Add to kept_alive_models so /predict knows not to stop it
     kept_alive_models.add(request.model_name)
     
@@ -81,7 +84,7 @@ async def start_model(request: ModelControlRequest):
         return {"status": "started", "model": request.model_name}
     except Exception as e:
         kept_alive_models.discard(request.model_name) # Rollback on failure
-        logging.error(f"Failed to start model {request.model_name}: {e}")
+        logger.error(f"Failed to start model {request.model_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/stop_model")
@@ -89,7 +92,7 @@ async def stop_model(request: ModelControlRequest):
     """
     Stops a model container that was previously kept running.
     """
-    logging.info(f"Request to stop model '{request.model_name}'")
+    logger.info(f"Request to stop model '{request.model_name}'")
     kept_alive_models.discard(request.model_name)
     
     try:
@@ -100,7 +103,7 @@ async def stop_model(request: ModelControlRequest):
         worker.stop()
         return {"status": "stopped", "model": request.model_name}
     except Exception as e:
-        logging.error(f"Failed to stop model {request.model_name}: {e}")
+        logger.error(f"Failed to stop model {request.model_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 class PredictionRequest(BaseModel):
@@ -123,7 +126,7 @@ async def predict_batch(request: PredictionRequest):
     """
     Takes a list of time series histories and performs a prediction for each with the specified model.
     """
-    logging.info(f"Request for batch prediction with model '{request.model_name}' received.")
+    logger.info(f"Request for batch prediction with model '{request.model_name}' received.")
 
 
     predictions = []
@@ -168,14 +171,14 @@ async def predict_batch(request: PredictionRequest):
         if prediction_result and "prediction" in prediction_result:
             predictions = prediction_result["prediction"]
         else:
-            logging.error(f"No valid prediction received from {request.model_name}.")
+            logger.error(f"No valid prediction received from {request.model_name}.")
             raise HTTPException(status_code=500, detail=f"No valid prediction received from {request.model_name}.")
 
     except Exception as e:
-        logging.error(f"An error occurred while processing {request.model_name}: {e}")
+        logger.error(f"An error occurred while processing {request.model_name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-    logging.info(f"Batch prediction for model '{request.model_name}' completed.")
+    logger.info(f"Batch prediction for model '{request.model_name}' completed.")
     return PredictionResponse(model_name=request.model_name, prediction=predictions)
 
 @app.get("/health")
