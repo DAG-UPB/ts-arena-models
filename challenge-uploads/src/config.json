@@ -422,7 +422,6 @@
     },
     "tabpfn-ts": {
         "name": "tabpfn-ts",
-        "enabled": false,
         "model_type": "TSFM",
         "model_family": "tabpfn-ts",
         "model_size": 11,
