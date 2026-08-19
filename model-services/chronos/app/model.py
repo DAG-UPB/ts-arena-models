@@ -66,8 +66,13 @@ class ChronosModel:
             ts_values = [item["value"] for item in series_data]
             ts_timestamps = [item["ts"] for item in series_data]
             
-            # Parse timestamps
-            index = pd.to_datetime(ts_timestamps)
+            # Parse timestamps. chronos-2's predict_df normalizes the timestamp
+            # column with .to_numpy().view("int64"), which only works on a
+            # datetime64 array. A tz-aware index (our inputs carry a "Z") makes
+            # .to_numpy() return an object array of Timestamps and that view()
+            # raises. Normalize to UTC and drop the tz so the column stays
+            # datetime64[ns].
+            index = pd.to_datetime(ts_timestamps, utc=True).tz_localize(None)
             
             df_seq = pd.DataFrame({
                 "id": f"series_{idx}",

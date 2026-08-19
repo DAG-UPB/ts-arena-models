@@ -1,8 +1,13 @@
-fastapi
-uvicorn
-pydantic
+# Pinned to the versions validated on 2026-08-19. Floating specifiers caused a
+# cold rebuild to jump chronos-forecasting/transformers/numpy several versions
+# and broke chronos-2 in prod; pin what has been tested.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
 torch==2.7.0
-chronos-forecasting>=2.0
-pandas
-python-dateutil
-boto3
+chronos-forecasting==2.3.1
+transformers==5.15.0
+numpy==2.5.2
+pandas==3.0.5
+python-dateutil==2.9.0.post0
+boto3==1.43.74
