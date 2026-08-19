@@ -1,6 +1,21 @@
-fastapi>=0.100.0
-uvicorn>=0.22.0
-pydantic>=2.0.0
-torch>=2.0.0
-numpy>=1.24.0
+# Pinned 2026-08-19 to the versions running in the image that produced the
+# clean rounds 11974-11977. Floating specifiers let a cold rebuild jump major
+# versions and silently change model behaviour -- that is how chronos-2 and
+# tabpfn-ts broke (models #21). Bump deliberately, then rebuild and test.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.8.0
+numpy==2.4.6
 granite-tsfm==0.3.3
+
+# Transitive numeric/ML stack, pinned explicitly: undeclared here before,
+# which is exactly how the chronos-2 break slipped in.
+transformers==4.56.0
+pandas==3.0.5
+scipy==1.17.1
+scikit-learn==1.7.2
+huggingface-hub==0.36.2
+safetensors==0.8.0
+accelerate==1.14.0
+datasets==5.0.1
