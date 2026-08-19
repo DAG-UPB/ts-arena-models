@@ -127,7 +127,6 @@
     },
     "chronos-2": {
         "name": "amazon/chronos-2",
-        "enabled": false,
         "model_type": "TSFM",
         "model_family": "chronos",
         "model_size": 120,
