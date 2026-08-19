@@ -105,7 +105,12 @@ class ChronosModel:
                 target="target",
             )
             
-            if df['id'].nunique() > 1:
+            # Shape the result after the *input*, not after how many series the
+            # frame happens to hold. main.py indexes result['forecasts'][i] for
+            # every batch request, so a batch carrying a single series must still
+            # come back as a list of series -- keying off nunique() returned a
+            # flat list there and main.py then iterated over a float.
+            if is_batch:
                 # Multiple series
                 forecasts_list = []
                 quantiles_dict = {}
