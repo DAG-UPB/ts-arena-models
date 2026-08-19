@@ -224,6 +224,7 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
     """
     resolved = []
     unmatched = []
+    disabled = []
 
     # Create lookup for registered models by name
     reg_lookup = {m.get("name"): m for m in registered_models}
@@ -232,6 +233,13 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
         conf_model_name = conf_data.get("name")
         logger.debug(f"Resolving model for container '{container_name}': {conf_model_name}")
         if not conf_model_name:
+            continue
+
+        # models #15: a model can be kept in the config but taken out of the running
+        # rounds with "enabled": false. Absent flag means enabled, so existing entries
+        # are unaffected.
+        if not conf_data.get("enabled", True):
+            disabled.append(f"{container_name} ({conf_model_name})")
             continue
 
         if container_name in reg_lookup:
@@ -245,6 +253,9 @@ def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any
     if unmatched:
         logger.warning(f"{len(unmatched)} model(s) from config not found in API: "
                        + ", ".join(unmatched))
+
+    if disabled:
+        logger.info(f"{len(disabled)} model(s) disabled in config: " + ", ".join(disabled))
 
     return resolved
 
