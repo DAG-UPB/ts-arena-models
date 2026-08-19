@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import numpy as np
 import os
 from typing import List, Union, Dict, Any
@@ -25,7 +29,7 @@ class TotoModel:
         Initializes the Toto model from HuggingFace.
         Uses the Toto-Open-Base-1.0 checkpoint.
         """
-        print("Initializing Toto model...")
+        logger.info("Initializing Toto model...")
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
@@ -37,7 +41,7 @@ class TotoModel:
         # Create forecaster
         self.forecaster = TotoForecaster(self.toto.model)
         
-        print(f"Toto initialized (device={self.device})")
+        logger.info(f"Toto initialized (device={self.device})")
 
     def predict(
         self,
@@ -73,58 +77,50 @@ class TotoModel:
         all_quantiles = []
         
         for idx, series in enumerate(data_as_batch):
-            try:
-                # Extract values
-                values = [item["value"] for item in series]
-                
-                # Convert to tensor: (1, seq_len) for univariate
-                input_series = torch.tensor(values, dtype=torch.float32).unsqueeze(0).to(self.device)
-                n_vars, seq_len = input_series.shape
-                
-                # Prepare timestamp information (not used by current model but required by API)
-                timestamp_seconds = torch.zeros(n_vars, seq_len, device=self.device)
-                
-                # Determine time interval from frequency
-                time_interval = self._freq_to_seconds(freq)
-                time_interval_seconds = torch.full((n_vars,), time_interval, device=self.device)
-                
-                # Create MaskedTimeseries object
-                inputs = MaskedTimeseries(
-                    series=input_series,
-                    padding_mask=torch.full_like(input_series, True, dtype=torch.bool),
-                    id_mask=torch.zeros_like(input_series),
-                    timestamp_seconds=timestamp_seconds,
-                    time_interval_seconds=time_interval_seconds,
-                )
-                
-                # Generate forecast
-                forecast = self.forecaster.forecast(
-                    inputs,
-                    prediction_length=horizon,
-                    num_samples=self.NUM_SAMPLES,
-                    samples_per_batch=min(self.NUM_SAMPLES, 64),  # Control memory usage
-                )
-                
-                # Extract median as point forecast
-                # Shape is [batch, vars, horizon] = [1, 1, horizon]
-                median_prediction = forecast.median.cpu().numpy()
-                forecast_values = median_prediction[0, 0, :].tolist()  # First batch, first variable
-                
-                # Extract quantiles
-                quantiles = {}
-                for q in self.QUANTILE_LEVELS:
-                    q_values = forecast.quantile(q).cpu().numpy()
-                    quantiles[str(q)] = q_values[0, 0, :].tolist()  # First batch, first variable
-                
-                all_forecasts.append(forecast_values)
-                all_quantiles.append(quantiles)
-                
-            except Exception as e:
-                print(f"Error predicting series {idx}: {e}")
-                import traceback
-                traceback.print_exc()
-                all_forecasts.append([0.0] * horizon)
-                all_quantiles.append({str(q): [0.0] * horizon for q in self.QUANTILE_LEVELS})
+            # Extract values
+            values = [item["value"] for item in series]
+            
+            # Convert to tensor: (1, seq_len) for univariate
+            input_series = torch.tensor(values, dtype=torch.float32).unsqueeze(0).to(self.device)
+            n_vars, seq_len = input_series.shape
+            
+            # Prepare timestamp information (not used by current model but required by API)
+            timestamp_seconds = torch.zeros(n_vars, seq_len, device=self.device)
+            
+            # Determine time interval from frequency
+            time_interval = self._freq_to_seconds(freq)
+            time_interval_seconds = torch.full((n_vars,), time_interval, device=self.device)
+            
+            # Create MaskedTimeseries object
+            inputs = MaskedTimeseries(
+                series=input_series,
+                padding_mask=torch.full_like(input_series, True, dtype=torch.bool),
+                id_mask=torch.zeros_like(input_series),
+                timestamp_seconds=timestamp_seconds,
+                time_interval_seconds=time_interval_seconds,
+            )
+            
+            # Generate forecast
+            forecast = self.forecaster.forecast(
+                inputs,
+                prediction_length=horizon,
+                num_samples=self.NUM_SAMPLES,
+                samples_per_batch=min(self.NUM_SAMPLES, 64),  # Control memory usage
+            )
+            
+            # Extract median as point forecast
+            # Shape is [batch, vars, horizon] = [1, 1, horizon]
+            median_prediction = forecast.median.cpu().numpy()
+            forecast_values = median_prediction[0, 0, :].tolist()  # First batch, first variable
+            
+            # Extract quantiles
+            quantiles = {}
+            for q in self.QUANTILE_LEVELS:
+                q_values = forecast.quantile(q).cpu().numpy()
+                quantiles[str(q)] = q_values[0, 0, :].tolist()  # First batch, first variable
+            
+            all_forecasts.append(forecast_values)
+            all_quantiles.append(quantiles)
         
         # Return results
         if not is_batch:

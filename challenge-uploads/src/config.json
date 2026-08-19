@@ -253,6 +253,7 @@
     },
     "naive": {
         "name": "Statistical/Naive",
+        "enabled": false,
         "model_type": "Baseline",
         "model_family": "Statistical",
         "model_size": 0,

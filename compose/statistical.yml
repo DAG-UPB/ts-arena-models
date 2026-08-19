@@ -1,6 +1,6 @@
 services:
-  naive-forecast:
-    image: naive-forecast
+  naive:
+    image: naive
     build:
       context: ../model-services/naive-forecast
       dockerfile: Dockerfile

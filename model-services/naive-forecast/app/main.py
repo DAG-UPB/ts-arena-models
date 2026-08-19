@@ -1,11 +1,39 @@
 from __future__ import annotations
 
+# --- logging (ts-arena #15) ---------------------------------------------
+# Configure the ROOT logger, not just this module's. Left unconfigured, root keeps
+# its default level WARNING with no handler at all: every logger.info() below is
+# dropped before the record is even built, and WARNING+ escapes through
+# logging.lastResort as bare text with no timestamp, no level and no logger name.
+# That is the defect that hid the ELO job for ten days in backend #75. Format and
+# LOG_LEVEL semantics match ts-arena-backend's logging_setup.py so the whole fleet
+# reads alike. Must stay above the `.model` import, which logs at import time.
+import logging
+import os
+import sys
+import time
+
+_LOG_LEVELS = {"CRITICAL": logging.CRITICAL, "FATAL": logging.CRITICAL,
+               "ERROR": logging.ERROR, "WARNING": logging.WARNING,
+               "WARN": logging.WARNING, "INFO": logging.INFO,
+               "DEBUG": logging.DEBUG}
+logging.Formatter.converter = time.gmtime  # asctime in UTC, hence the trailing Z
+logging.basicConfig(
+    level=_LOG_LEVELS.get(os.getenv("LOG_LEVEL", "").strip().upper(), logging.INFO),
+    format="%(asctime)sZ | %(levelname)s | %(name)s | %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
+# ------------------------------------------------------------------------
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Union, Dict, Optional
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from .model import NaiveForecastModel
+
 
 class HistoryItem(BaseModel):
     ts: str
@@ -53,12 +81,27 @@ def generate_future_timestamps(last_timestamp: datetime, horizon: int, freq: str
     return timestamps
 
 
-def create_forecast_items(timestamps: List[str], values: List[float]) -> List[ForecastItem]:
-    """Create ForecastItem list from timestamps and values"""
-    return [
-        ForecastItem(ts=ts, value=float(val), probabilistic_values={})
-        for ts, val in zip(timestamps, values)
-    ]
+def create_forecast_items(
+    timestamps: List[str],
+    values: List[float],
+    quantiles_dict: Optional[Dict[str, List[float]]] = None,
+) -> List[ForecastItem]:
+    """Create ForecastItem list from timestamps, values, and optional quantiles"""
+    forecasts = []
+    for i, (ts, val) in enumerate(zip(timestamps, values)):
+        probabilistic_values = {}
+        if quantiles_dict:
+            for level, quantile_values in quantiles_dict.items():
+                if i < len(quantile_values):
+                    probabilistic_values[f"q_{level}"] = float(quantile_values[i])
+        forecasts.append(
+            ForecastItem(
+                ts=ts,
+                value=float(val),
+                probabilistic_values=probabilistic_values,
+            )
+        )
+    return forecasts
 
 
 app = FastAPI()
@@ -66,7 +109,7 @@ model = NaiveForecastModel()
 
 
 @app.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest):
+def predict(request: PredictionRequest):
     if not request.history:
         raise HTTPException(status_code=400, detail="History cannot be empty")
     
@@ -84,13 +127,17 @@ async def predict(request: PredictionRequest):
             last_timestamps.append(last_ts)
         
         # Get predictions from model
-        predictions = model.predict(history_values, request.horizon)
+        result = model.predict(history_values, request.horizon)
+        predictions = result["forecasts"]
+        quantiles_list = result.get("quantiles", [])
         
         # Create ForecastItems for each series
         all_forecasts = []
-        for pred_values, last_ts in zip(predictions, last_timestamps):
+        for i, last_ts in enumerate(last_timestamps):
             future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-            forecasts = create_forecast_items(future_ts, pred_values)
+            pred_values = predictions[i]
+            quantiles_dict = quantiles_list[i] if i < len(quantiles_list) else None
+            forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
             all_forecasts.append(forecasts)
         
         return {"prediction": all_forecasts}
@@ -100,11 +147,13 @@ async def predict(request: PredictionRequest):
         last_ts = datetime.fromisoformat(request.history[-1].ts.replace('Z', '+00:00').replace('+00:00', ''))
         
         # Get prediction from model
-        prediction = model.predict(history_values, request.horizon)
+        result = model.predict(history_values, request.horizon)
+        prediction = result["forecasts"]
+        quantiles_dict = result.get("quantiles")
         
         # Create ForecastItems
         future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
-        forecasts = create_forecast_items(future_ts, prediction)
+        forecasts = create_forecast_items(future_ts, prediction, quantiles_dict)
         
         return {"prediction": forecasts}
 
@@ -112,11 +161,11 @@ async def predict(request: PredictionRequest):
 @app.get("/health")
 async def health_check():
     try:
-        prediction = model.predict([1,2,3,4,5], horizon=1)
-        # Model loading check
-        if prediction is not None:
+        result = model.predict([1, 2, 3, 4, 5], horizon=1)
+        if result is not None and "forecasts" in result:
             return {"status": "healthy", "model": "ready"}
         else:
             raise HTTPException(status_code=503, detail="Model not ready")
-    except Exception:
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}")

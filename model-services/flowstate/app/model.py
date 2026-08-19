@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import numpy as np
 from typing import List, Union, Dict, Any
@@ -6,7 +10,7 @@ import os
 from tsfm_public import FlowStateForPrediction
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 
 # Scale factor mapping for common frequencies
@@ -35,13 +39,13 @@ class FlowstateModel:
         """
         model_id = os.getenv("MODEL_ID", "ibm-research/flowstate")
         
-        print(f"Loading FlowState model: {model_id}")
+        logger.info(f"Loading FlowState model: {model_id}")
         
         self.model = FlowStateForPrediction.from_pretrained(model_id)
         self.model = self.model.to(device)
         self.model.eval()
         
-        print("FlowState model loaded successfully")
+        logger.info("FlowState model loaded successfully")
 
     def _get_scale_factor(self, freq: str) -> float:
         """Get scale factor for given frequency."""
@@ -126,40 +130,56 @@ class FlowstateModel:
             # Denormalize point forecast
             point_forecast = point_forecast_norm * std + mean
             
-            # Extract quantiles from model output
-            # FlowState outputs shape: (batch, 9, forecast_length, n_ch)
+            # Extract quantiles from model output.
+            # FlowState outputs shape: (batch, n_quantiles, forecast_length, n_ch).
+            EXPECTED_QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
             quantiles_dict = {}
             if quantile_forecast is not None and len(quantile_forecast.shape) == 2:
                 n_quantiles = quantile_forecast.shape[0]
-                quantile_mapping = {
-                    0.1: 0,
-                    0.2: 1,
-                    0.3: 2,
-                    0.4: 3,
-                    0.5: 4,
-                    0.6: 5,
-                    0.7: 6,
-                    0.8: 7,
-                    0.9: 8
-                }
-                for q in quantile_levels:
-                    if q in quantile_mapping and quantile_mapping[q] < n_quantiles:
-                        q_values = quantile_forecast[quantile_mapping[q]] * std + mean
-                        quantiles_dict[q] = q_values.tolist()
-                    else:
-                        quantiles_dict[q] = point_forecast.tolist()
-                
-                # Use q_0.5 (median) as point forecast for consistency
-                if 0.5 in quantiles_dict:
-                    results.append(quantiles_dict[0.5])
-                else:
-                    results.append(point_forecast.tolist())
+                # Defensive guard: `tsfm_public` is NOT importable offline, so the
+                # declared quantile grid of FlowStateForPrediction cannot be
+                # introspected here. The model is expected to emit exactly 9
+                # deciles ordered 0.1..0.9 along axis 0. The exact level ordering
+                # MUST be confirmed live on the GPU host by inspecting
+                # self.model's config / output metadata. If the grid differs,
+                # the assertion below raises loudly rather than silently
+                # mislabelling heads.
+                if n_quantiles != len(EXPECTED_QUANTILE_LEVELS):
+                    raise RuntimeError(
+                        f"FlowState returned {n_quantiles} quantile heads, "
+                        f"expected {len(EXPECTED_QUANTILE_LEVELS)} "
+                        f"(levels {EXPECTED_QUANTILE_LEVELS}). Confirm the "
+                        f"model's quantile grid live on the GPU host."
+                    )
+
+                # Denormalize all quantile heads at once: (9, forecast_length)
+                q_denorm = quantile_forecast * std + mean
+
+                # Enforce monotonicity per forecast step: sort the 9 denormalized
+                # quantile values ascending and re-assign to levels 0.1..0.9 so
+                # q_0.1 <= ... <= q_0.9. This mirrors timesfm2_5's
+                # `fix_quantile_crossing` intent and guarantees a valid
+                # (non-crossing) quantile distribution after denormalization.
+                q_sorted = np.sort(q_denorm, axis=0)
+
+                # Emit a q_* entry only for levels the model actually produced.
+                # Do NOT fabricate entries for missing/unavailable levels (the
+                # backend handles degenerate substitution centrally per
+                # backend #13).
+                for level, row in zip(EXPECTED_QUANTILE_LEVELS, q_sorted):
+                    quantiles_dict[level] = row.tolist()
+
+                # Median consistency: q_0.5 is the middle (index 4) of the
+                # sorted 9-decile grid and is used as the point `value`.
+                results.append(q_sorted[len(EXPECTED_QUANTILE_LEVELS) // 2].tolist())
             else:
-                # No quantiles available, use point forecast for all
-                for q in quantile_levels:
-                    quantiles_dict[q] = point_forecast.tolist()
+                # No quantile heads emitted by the model: emit NO quantiles
+                # (empty dict) rather than fabricating a degenerate distribution
+                # of point-forecast copies. The backend handles degenerate
+                # substitution centrally per backend #13.
                 results.append(point_forecast.tolist())
-                    
+
             quantiles_results.append(quantiles_dict)
         
         if not is_batch:

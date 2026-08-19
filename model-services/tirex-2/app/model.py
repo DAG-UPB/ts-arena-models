@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -17,7 +21,7 @@ class TiRex2Model:
         """
         model_id = os.getenv("MODEL_ID", "NX-AI/TiRex-2")
         device = os.getenv("DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Loading TiRex-2 model from {model_id} (device: {device})...")
+        logger.info(f"Loading TiRex-2 model from {model_id} (device: {device})...")
         self.model: ForecastModel = load_model(model_id, device=device)
         if device.startswith("cuda"):
             # The fused flashrnn sLSTM CUDA kernel requires compute capability >= 8.0
@@ -31,7 +35,7 @@ class TiRex2Model:
                 with torch.no_grad():
                     self.model.forecast([smoke], prediction_length=1, output_type="numpy")
             except Exception as e:
-                print(f"CUDA inference not usable on this GPU ({e}); falling back to CPU")
+                logger.warning(f"CUDA inference not usable on this GPU ({e}); falling back to CPU")
                 self.model = load_model(model_id, device="cpu")
         # Quantile levels natively forecast by the checkpoint (e.g. 0.1 ... 0.9)
         self.quantile_levels: List[float] = [round(float(q), 6) for q in self.model.quantiles]
@@ -39,7 +43,7 @@ class TiRex2Model:
             range(len(self.quantile_levels)),
             key=lambda i: abs(self.quantile_levels[i] - 0.5),
         )
-        print(f"TiRex-2 model loaded successfully (quantiles: {self.quantile_levels})")
+        logger.info(f"TiRex-2 model loaded successfully (quantiles: {self.quantile_levels})")
 
     def predict(
         self,

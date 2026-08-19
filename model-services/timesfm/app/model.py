@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import timesfm
 import numpy as np
@@ -7,14 +11,14 @@ from huggingface_hub import hf_hub_download
 from pathlib import Path
 
 device = "gpu" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 class TimesFMModel:
     def __init__(self) -> None:
         self.model_id = os.getenv("MODEL_ID", "google/timesfm-2.0-500m-pytorch")
-        print(f"Loading model from {self.model_id}...")
+        logger.info(f"Loading model from {self.model_id}...")
         local_dir = Path(f"/models/{self.model_id.split('/')[-1]}")
-        print(f"Ensuring model is present in {local_dir}...")
+        logger.info(f"Ensuring model is present in {local_dir}...")
         filename = "torch_model.ckpt"
         hf_hub_download(repo_id=self.model_id, local_dir=local_dir, filename=filename)
 
@@ -31,7 +35,7 @@ class TimesFMModel:
             context_len = 512
             use_pos_emb = True
         else:
-            print(f"Warning: Unknown model ID {self.model_id}, using default parameters for 2.0-500m")
+            logger.warning(f"Unknown model ID {self.model_id}, using default parameters for 2.0-500m")
             num_layers = 50
             context_len = 2048
             use_pos_emb = False

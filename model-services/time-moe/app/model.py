@@ -1,10 +1,14 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 from transformers import AutoModelForCausalLM
 import numpy as np
 import os
 from typing import List, Union
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 class TimeMoEModel:
     def __init__(self) -> None:
         """

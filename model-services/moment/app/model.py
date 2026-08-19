@@ -1,10 +1,14 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import os
 from typing import List, Union, Dict
 from momentfm import MOMENTPipeline
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
 class MomentModel:
     def __init__(self) -> None:
@@ -14,7 +18,7 @@ class MomentModel:
 
     def _get_pipeline(self, forecast_horizon: int) -> MOMENTPipeline:
         if forecast_horizon not in self.pipeline_cache:
-            print(f"Loading MOMENT pipeline for horizon {forecast_horizon}")
+            logger.info(f"Loading MOMENT pipeline for horizon {forecast_horizon}")
             self.pipeline_cache[forecast_horizon] = MOMENTPipeline.from_pretrained(
                 self.model_name,
                 model_kwargs={
@@ -51,11 +55,11 @@ class MomentModel:
 
         pipeline = self._get_pipeline(horizon)
         pipeline.to(device)
-        print("Horizon loaded in pipeline:", pipeline.head.linear.out_features)
+        logger.debug(f"Horizon loaded in pipeline: {pipeline.head.linear.out_features}")
         # Forecast
         outputs = pipeline.forecast(x_enc=context, input_mask=input_mask)
         forecast = outputs.forecast  # [batch_size, n_channels, forecast_horizon]
-        print("Forecast shape:", forecast.shape)
+        logger.debug(f"Forecast shape: {forecast.shape}")
         # Convert back to [batch_size, forecast_horizon]
         result = [
             forecast[i, 0, :horizon].detach().cpu().tolist()
