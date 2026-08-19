@@ -11,12 +11,15 @@
 #
 # Moving to v3 is a deliberate benchmark decision (new model entry, not an
 # in-place upgrade), not a dependency bump.
-fastapi
-uvicorn
-pydantic
-pandas
-python-dateutil
+#
+# Versions below are the set validated on 2026-08-19 (v2 checkpoint
+# tabpfn-v2-regressor-2noar4o2.ckpt, 9 quantile levels, no token required).
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+pandas==2.3.3
+python-dateutil==2.9.0.post0
 tabpfn-time-series==1.0.10
 tabpfn==7.0.0
-torch
-numpy
+torch==2.13.0
+numpy==2.5.2
