@@ -30,3 +30,15 @@ services:
     environment:
       - MODEL_ID=google/timesfm-2.5-200m-pytorch
     profiles: ["timesfm", "all-models"]
+
+  timesfm-3.0:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: timesfm-3.0
+    build:
+      context: ../model-services/timesfm3
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_ID=google/timesfm-3.0-pytorch
+    profiles: ["timesfm", "all-models"]

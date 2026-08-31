@@ -27,6 +27,20 @@
         },
         "organization_id": 2
     },
+    "timesfm-3.0": {
+        "name": "google/timesfm-3.0-pytorch",
+        "model_type": "TSFM",
+        "model_family": "timesfm",
+        "model_size": 330,
+        "hosting": "UPB",
+        "architecture": "decoder-only, cross-variate attention",
+        "pretraining_data": "TimesFM 3.0 dataset",
+        "publishing_date": "2026-08-24",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 2
+    },
     "sundial-128m": {
         "name": "thuml/sundial-base-128m",
         "model_type": "TSFM",
