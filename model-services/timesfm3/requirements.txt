@@ -1,0 +1,15 @@
+# Pinned deliberately, matching the timesfm2_5 service. Floating specifiers let a
+# cold rebuild jump major versions and silently change model behaviour -- that is how
+# chronos-2 and tabpfn-ts broke (models #21). Bump deliberately, then rebuild and test.
+# torch/torchvision are NOT pinned here on purpose: they ship preinstalled in the
+# pytorch/pytorch base image, which the FROM tag already pins exactly. Pinning the
+# +cuXXX local version here is unresolvable from PyPI and breaks the build.
+# The timesfm package itself is pinned by commit in the Dockerfile (TIMESFM_REF).
+
+fastapi==0.135.1
+uvicorn==0.42.0
+pydantic==2.12.5
+numpy==2.2.6
+python-dateutil==2.9.0.post0
+safetensors==0.7.0
+huggingface_hub==1.7.1
