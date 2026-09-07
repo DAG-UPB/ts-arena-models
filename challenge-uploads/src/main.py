@@ -579,6 +579,26 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     return True
 
 
+def sleep_until_next_tick(interval: int):
+    """
+    Sleep until the next wall-clock multiple of `interval`.
+
+    The loop used to end with a plain `time.sleep(interval)`, which measures from the
+    moment the work finished rather than from a fixed grid. Processing a round takes
+    8-9 minutes, so every processed round pushed the poll phase that much further
+    forward and the drift accumulated across days: first contact with a round slid
+    from ~3 minutes after its registration opened to ~13 minutes. Against a 15-minute
+    registration window that is the difference between the whole roster getting in and
+    the tail being refused with "Registration has ended".
+
+    Anchoring to the wall clock keeps the phase fixed no matter how long a round takes.
+    """
+    delay = interval - (time.time() % interval)
+    if delay < 1.0:            # we are already on a tick; wait for the next one
+        delay += interval
+    time.sleep(delay)
+
+
 def main_loop():
     """Main loop: Check regularly for new challenges"""
     logger.info("Challenge Upload Service started")
@@ -649,15 +669,15 @@ def main_loop():
                     logger.error(f"Error processing round {round_id}: {e}")
 
             # Wait for next check
-            logger.debug(f"Waiting {CHECK_INTERVAL}s for next check...")
-            time.sleep(CHECK_INTERVAL)
+            logger.debug(f"Waiting for the next {CHECK_INTERVAL}s tick...")
+            sleep_until_next_tick(CHECK_INTERVAL)
 
         except KeyboardInterrupt:
             logger.info("Service stopping...")
             break
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
-            time.sleep(CHECK_INTERVAL)
+            sleep_until_next_tick(CHECK_INTERVAL)
 
 
 def main_once():
