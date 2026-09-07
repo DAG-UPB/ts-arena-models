@@ -21,5 +21,5 @@ pandas==2.3.3
 python-dateutil==2.9.0.post0
 tabpfn-time-series==1.0.10
 tabpfn==7.0.0
-torch==2.13.0
+torch==2.13.0            # installed from the cu126 index in the Dockerfile -- see models #7
 numpy==2.5.2
