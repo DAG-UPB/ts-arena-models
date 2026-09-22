@@ -6,8 +6,8 @@ import json
 import re
 import csv
 import traceback
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import requests
 from dotenv import load_dotenv
@@ -444,30 +444,151 @@ def format_forecasts(
 
 
 # --- Upload ---
-def upload_forecasts(round_id: int, model_name: str, forecasts: List[Dict[str, Any]]):
-    """Upload forecasts for a challenge round"""
+class UploadRejected(Exception):
+    """The platform refused part or all of an upload. Deterministic — do not retry."""
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Is this upload failure worth trying again?
+
+    Connection errors and 5xx are transient — the forecast is already computed, so
+    re-POSTing it is cheap (models #14). A 4xx is the server telling us the request is
+    wrong, including `400 Registration has ended`; retrying that only wastes the window.
+    """
+    if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        return True
+    if isinstance(exc, requests.exceptions.HTTPError) and exc.response is not None:
+        return exc.response.status_code >= 500
+    return False
+
+
+def upload_forecasts(round_id: int, model_name: str, forecasts: List[Dict[str, Any]],
+                     deadline: Optional[datetime] = None) -> Dict[str, Any]:
+    """Upload forecasts for a challenge round, retrying transient failures.
+
+    Two things this used to get wrong (models #14):
+
+    * **No retry.** A ~35 s API outage on 2026-07-22 cost three models their round 11522
+      forecasts, which had already been computed. Transient failures are now retried with
+      backoff, bounded by the round's registration deadline.
+    * **No verification.** It logged a tick based on the series it *sent*. A partially
+      accepted upload comes back as **HTTP 201** with the rejections in `errors`, so one
+      accepted series out of sixteen still read as success. It now parses the response and
+      raises `UploadRejected` on anything refused.
+
+    Returns the parsed response body so the caller can log the platform's own numbers.
+    """
     payload = {
         "round_id": round_id,
         "model_name": model_name,
         "forecasts": forecasts
     }
-    
+    expected_points = sum(len(series["forecasts"]) for series in forecasts)
+
+    backoffs = [2, 5, 10]
+    attempt = 0
+    while True:
+        try:
+            resp = http_post("/api/v1/forecasts/upload", json_data=payload)
+            break
+        except Exception as e:
+            out_of_time = deadline is not None and datetime.now(timezone.utc) >= deadline
+            if not _is_retryable(e) or attempt >= len(backoffs) or out_of_time:
+                reason = ("registration window closed" if out_of_time
+                          else "not retryable" if not _is_retryable(e)
+                          else "retries exhausted")
+                logger.error(
+                    f"✗ Upload failed for round {round_id}, model {model_name} ({reason}): {e}"
+                )
+                raise
+            wait = backoffs[attempt]
+            attempt += 1
+            logger.warning(
+                f"  upload attempt {attempt} for round {round_id}, model {model_name} "
+                f"failed ({e}); retrying in {wait}s"
+            )
+            time.sleep(wait)
+
     try:
-        http_post("/api/v1/forecasts/upload", json_data=payload)
-        logger.info(f"✓ Upload successful for round {round_id}, model {model_name}: {len(forecasts)} series")
-    except Exception as e:
-        logger.error(f"✗ Error uploading for round {round_id}, model {model_name}: {e}")
-        raise
+        body = resp.json() or {}
+    except ValueError:
+        logger.warning("Upload response was not JSON; cannot verify what was stored")
+        return {}
+
+    # `warnings` and the point/probabilistic split arrive from newer api-portal versions
+    # only. Read everything defensively so this keeps working against both.
+    errors = body.get("errors") or []
+    warnings = body.get("warnings") or []
+    rejections = [e for e in errors if e not in warnings]
+
+    inserted = body.get("points_inserted", body.get("forecasts_inserted", 0))
+    probabilistic = body.get("probabilistic_points_inserted")
+
+    stored = f"{inserted}/{expected_points} points"
+    if probabilistic is not None:
+        stored += f", {probabilistic} with quantiles"
+
+    for warning in warnings:
+        logger.warning(f"  upload warning: {warning}")
+
+    if rejections or inserted < expected_points:
+        for rejection in rejections:
+            logger.error(f"  upload rejected: {rejection}")
+        raise UploadRejected(
+            f"round {round_id}, model {model_name}: stored {stored}"
+            + (f"; {len(rejections)} rejection(s): {rejections}" if rejections else "")
+        )
+
+    logger.info(f"✓ Upload verified for round {round_id}, model {model_name}: {stored}")
+    return body
+
+
+def registration_deadline(challenge: Dict[str, Any]) -> Optional[datetime]:
+    """The round's `registration_end` as an aware datetime, or None if unusable.
+
+    None means "treat the round as open": the uploader's job is to try, and the API is the
+    authority on the deadline.
+    """
+    raw = challenge.get("registration_end")
+    if not raw:
+        return None
+    try:
+        deadline = datetime.fromisoformat(str(raw).replace('Z', '+00:00'))
+    except Exception:
+        logger.debug(f"Unparseable registration_end {raw!r}; treating the round as open")
+        return None
+    return deadline if deadline.tzinfo else deadline.replace(tzinfo=timezone.utc)
+
+
+def registration_is_open(challenge: Dict[str, Any]) -> bool:
+    """Can this round still accept an upload? Used to bound every retry (models #14)."""
+    deadline = registration_deadline(challenge)
+    return deadline is None or datetime.now(timezone.utc) < deadline
 
 
 # --- Main ---
 def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, str]],
-                      retry: int = 0) -> bool:
+                      submitted: Optional[Set[str]] = None,
+                      refused: Optional[Set[str]] = None, retry: int = 0) -> bool:
     """Process a single challenge round.
 
-    Returns True if the challenge was fully processed (or permanently
-    skipped), False if it should be retried later (e.g. context data
-    not yet available).
+    Returns True if the round is **settled** — every active model has either uploaded
+    successfully or is permanently unprocessable — and False if it should be retried
+    later (context data not yet available, or an upload that can still be re-attempted
+    inside the registration window).
+
+    `submitted` is the set of model names that already uploaded for this round in an
+    earlier pass; it is **mutated in place** as models succeed. Passing it back on a retry
+    is what stops a partially successful round from re-uploading the models that already
+    landed (models #14) — a duplicate upload returns `points_inserted: 0`, which the
+    verification in `upload_forecasts` would otherwise read as a fresh rejection.
+
+    `refused` is the same idea for models the platform **rejected on content** — an unknown
+    series name, a wrong point count. Those are deterministic: the identical payload will
+    be refused identically, so re-predicting them every poll would burn the GPU for nothing
+    (30 models re-running each minute until the window closed). They are dropped from the
+    round instead. Only transient failures — a connection error or 5xx that outlived the
+    in-call backoff, or a prediction that did not come back — keep the round open.
 
     `retry` is how many times this round has already come back not-ready. It is a
     logging knob only (ts-arena #15): the round preamble and the "not ready" line
@@ -477,6 +598,10 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     """
     round_id = challenge.get("id")
     challenge_name = challenge.get("name", "Unknown")
+    if submitted is None:
+        submitted = set()
+    if refused is None:
+        refused = set()
 
     # First look at this round gets the full preamble; the repeats go to DEBUG.
     detail = logger.info if retry == 0 else logger.debug
@@ -502,17 +627,27 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
     detail(f"  Frequency: {frequency_str} -> {frequency_delta}")
     detail(f"  Horizon: {horizon_str} -> {horizon_steps} steps")
 
+    def wait_for(what: str) -> bool:
+        """Retry while the round can still accept an upload; give up once it cannot.
+
+        Without the deadline check a round whose context data never appears is re-polled
+        forever (models #14).
+        """
+        if registration_is_open(challenge):
+            not_ready(f"{what} for round {round_id} – will retry in next iteration")
+            return False
+        logger.error(f"Round {round_id}: registration closed with {what.lower()}")
+        return True
+
     # Fetch context data
     context_data = get_context_data(str(round_id))
     if not context_data:
-        not_ready(f"No context data for round {round_id} – will retry in next iteration")
-        return False
+        return wait_for("No context data")
 
     # Extract history in HistoryItem format
     histories, series_names, max_timestamps = extract_history_from_context(context_data)
     if not histories:
-        not_ready(f"No usable history data for round {round_id} – will retry in next iteration")
-        return False
+        return wait_for("No usable history data")
 
     logger.info(f"  {len(histories)} series found")
 
@@ -539,8 +674,16 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
             logger.warning(f"Could not map frequency '{frequency_str}' to model format, using 'h'")
             model_freq = 'h'
     
-    # Process for each model in active_models
-    for container_name, api_model_name in active_models:
+    deadline = registration_deadline(challenge)
+
+    # Process each model that has neither uploaded nor been refused for this round.
+    settled_models = submitted | refused
+    pending = [(c, a) for c, a in active_models if a not in settled_models]
+    if settled_models:
+        logger.info(f"  Skipping {len(submitted)} model(s) already uploaded and "
+                    f"{len(refused)} the platform refused for this round")
+
+    for container_name, api_model_name in pending:
         logger.info(f"  Creating predictions with container {container_name} for model {api_model_name}")
 
         t_start: Optional[float] = None
@@ -563,10 +706,25 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
             forecasts = format_forecasts(predictions, series_names, max_timestamps, frequency_delta)
 
             # Upload uses api_model_name
-            upload_forecasts(int(round_id), container_name, forecasts)
+            result = upload_forecasts(int(round_id), container_name, forecasts,
+                                      deadline=deadline)
+            # Only a verified upload counts as submitted.
+            submitted.add(api_model_name)
+            # Report what the PLATFORM stored, never what we sent.
+            log_participation(
+                str(round_id), challenge_name, container_name, api_model_name, "SUCCESS",
+                f"Stored {result.get('points_inserted', result.get('forecasts_inserted', '?'))} points "
+                f"({result.get('probabilistic_points_inserted', '?')} with quantiles) "
+                f"across {len(forecasts)} series",
+                duration_s=duration_s)
+
+        except UploadRejected as e:
+            # Content the platform refused. Deterministic — do not re-attempt this round.
+            duration_s = (time.perf_counter() - t_start) if t_start is not None else None
+            refused.add(api_model_name)
+            logger.error(f"Upload refused for {container_name}, not retrying this round: {e}")
             log_participation(str(round_id), challenge_name, container_name, api_model_name,
-                              "SUCCESS", f"Uploaded {len(forecasts)} series",
-                              duration_s=duration_s)
+                              "FAILURE", f"refused: {e}", duration_s=duration_s)
 
         except Exception as e:
             duration_s = (time.perf_counter() - t_start) if t_start is not None else None
@@ -576,6 +734,29 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
                               "FAILURE", f"{str(e)}\n{error_details}",
                               duration_s=duration_s)
 
+    outstanding = [a for _, a in active_models if a not in submitted and a not in refused]
+    if not outstanding:
+        if refused:
+            logger.error(
+                f"Round {round_id} settled with {len(refused)} model(s) refused "
+                f"({', '.join(sorted(refused))})"
+            )
+        return True
+
+    # Something did not land. Retry it while the round can still accept an upload — this
+    # is the half of models #14 that cost round 11522 three models' forecasts: the loop
+    # used to mark the round processed regardless, so a computed forecast was thrown away.
+    if registration_is_open(challenge):
+        logger.warning(
+            f"Round {round_id}: {len(outstanding)} model(s) did not upload "
+            f"({', '.join(outstanding)}) – will retry while registration is open"
+        )
+        return False
+
+    logger.error(
+        f"Round {round_id}: registration closed with {len(outstanding)} model(s) "
+        f"never uploaded ({', '.join(outstanding)})"
+    )
     return True
 
 
@@ -626,7 +807,9 @@ def main_loop():
     # ts-arena #15: rounds that are not ready yet are deliberately re-tried every
     # CHECK_INTERVAL, but they used to re-emit the whole preamble each time. Count
     # the retries so the repeats can drop to DEBUG and the wait is reported once.
-    pending_retries: Dict[Any, int] = {}
+    # models #14: the same entry also carries which models already uploaded, so a retry
+    # re-attempts only what actually failed.
+    pending: Dict[Any, Dict[str, Any]] = {}
     last_challenge_count = None
 
     while True:
@@ -639,6 +822,16 @@ def main_loop():
             else:
                 logger.debug(f"Found challenges: {len(challenges)} (unchanged)")
 
+            # A round that has dropped out of the registration list can no longer be
+            # uploaded to, so stop carrying its retry state.
+            open_ids = {c.get("id") for c in challenges}
+            for gone in [rid for rid in pending if rid not in open_ids]:
+                state = pending.pop(gone)
+                logger.error(
+                    f"Round {gone} left the registration list after {state['retry']} "
+                    f"retries with {len(state['submitted'])} model(s) uploaded"
+                )
+
             for challenge in challenges:
                 round_id = challenge.get("id")
 
@@ -648,25 +841,35 @@ def main_loop():
                     continue
 
                 # Process challenge
-                retry = pending_retries.get(round_id, 0)
+                state = pending.setdefault(
+                    round_id, {"retry": 0, "submitted": set(), "refused": set()})
+                retry = state["retry"]
                 try:
-                    completed = process_challenge(challenge, active_models, retry=retry)
-                    if completed:
-                        processed_challenges.add(round_id)
-                        if pending_retries.pop(round_id, 0):
-                            logger.info(
-                                f"Round {round_id} became ready after {retry} retries "
-                                f"(~{retry * CHECK_INTERVAL}s wait)"
-                            )
-                    else:
-                        pending_retries[round_id] = retry + 1
-                        if retry == 0:
-                            logger.info(
-                                f"Round {round_id} not ready yet – retrying silently every "
-                                f"{CHECK_INTERVAL}s (set LOG_LEVEL=DEBUG to see each attempt)"
-                            )
+                    completed = process_challenge(challenge, active_models,
+                                                  submitted=state["submitted"],
+                                                  refused=state["refused"], retry=retry)
                 except Exception as e:
+                    # An unexpected error is not evidence the round is done. Leave it
+                    # pending so the next poll tries again.
                     logger.error(f"Error processing round {round_id}: {e}")
+                    state["retry"] = retry + 1
+                    continue
+
+                if completed:
+                    processed_challenges.add(round_id)
+                    pending.pop(round_id, None)
+                    if retry:
+                        logger.info(
+                            f"Round {round_id} settled after {retry} retries "
+                            f"(~{retry * CHECK_INTERVAL}s wait)"
+                        )
+                else:
+                    state["retry"] = retry + 1
+                    if retry == 0:
+                        logger.info(
+                            f"Round {round_id} not ready yet – retrying silently every "
+                            f"{CHECK_INTERVAL}s (set LOG_LEVEL=DEBUG to see each attempt)"
+                        )
 
             # Wait for next check
             logger.debug(f"Waiting for the next {CHECK_INTERVAL}s tick...")
@@ -699,7 +902,12 @@ def main_once():
     logger.info(f"Found challenges: {len(challenges)}")
     
     for challenge in challenges:
-        process_challenge(challenge, active_models)
+        # One-shot: there is no next poll, so an unsettled round is reported, not retried.
+        if not process_challenge(challenge, active_models):
+            logger.warning(
+                f"Round {challenge.get('id')} did not fully submit. Re-run, or use the "
+                f"service loop, while registration is still open."
+            )
 
 
 if __name__ == "__main__":
