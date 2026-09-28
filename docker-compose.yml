@@ -72,6 +72,7 @@ include:
   - compose/tinytimemixer.yml
   - compose/tabpfn-ts.yml
   - compose/toto.yml
+  - compose/toto2.yml
 
 volumes:
   arena-db:
