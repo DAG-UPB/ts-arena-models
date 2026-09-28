@@ -197,6 +197,7 @@
     },
     "moment-small": {
         "name": "AutonLab/MOMENT-1-small",
+        "enabled": false,
         "model_type": "TSFM",
         "model_family": "moment",
         "model_size": 40,
@@ -211,6 +212,7 @@
     },
     "moment-base-model": {
         "name": "AutonLab/MOMENT-1-base",
+        "enabled": false,
         "model_type": "TSFM",
         "model_family": "moment",
         "model_size": 125,
@@ -225,6 +227,7 @@
     },
     "moment-large": {
         "name": "AutonLab/MOMENT-1-large",
+        "enabled": false,
         "model_type": "TSFM",
         "model_family": "moment",
         "model_size": 385,
