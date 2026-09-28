@@ -533,7 +533,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 28
     },
     "t0-beta": {
         "name": "theforecastingcompany/t0-beta",
@@ -547,6 +547,6 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 28
     }
 }
