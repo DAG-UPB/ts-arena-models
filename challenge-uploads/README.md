@@ -72,6 +72,27 @@ The service remembers already processed challenges (in memory) and skips them on
 - `WARNING`: Issues processing individual series
 - `ERROR`: Critical errors in API calls or predictions
 
+## Inference cost archive (`model_runs.duckdb`)
+
+Every prediction attempt adds one row to `$LOG_DIR/model_runs.duckdb` (override with
+`MODEL_RUNS_DB`, or set it to an empty string to turn it off). The row holds what the
+master controller measured for the call: container start time, warm inference time, the
+model container's CPU time, and on its GPU the energy (NVML), power, utilisation and memory.
+It also holds the workload shape (series, horizon, context points) and the outcome.
+
+- `round_id`, `model_id` and `model_name` match `challenges.rounds.id`,
+  `models.model_info.id` and `models.model_info.name` in the platform database.
+- `gpu_foreign_procs > 0` means another process shared the GPU during the call, so the
+  energy figure includes its work.
+- The file is never pruned. Writes are best-effort: a missing, locked or corrupt file is
+  logged and never affects a forecast.
+- DuckDB allows one writer. Open the file read-only while the service runs:
+
+  ```python
+  import duckdb
+  duckdb.connect("logs/challenge-uploads/model_runs.duckdb", read_only=True)
+  ```
+
 ## Example Output
 
 ```

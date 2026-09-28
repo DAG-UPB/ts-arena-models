@@ -4,6 +4,7 @@ import logging
 import logging.handlers
 import json
 import re
+import socket
 import csv
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -12,6 +13,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import requests
 from dotenv import load_dotenv
 import isodate
+
+from model_runs import ModelRunsWriter
 
 # --- Initialization ---
 load_dotenv()
@@ -69,6 +72,13 @@ PARTICIPATION_LOG_FILE = os.environ.get(
     "PARTICIPATION_LOG_FILE", os.path.join(LOG_DIR, "participation_log.csv")
 )
 LOG_RETENTION_DAYS = int(os.environ.get("LOG_RETENTION_DAYS", "3"))
+# Permanent archive of what each prediction cost (see model_runs.py). Not subject to
+# LOG_RETENTION_DAYS. Set to an empty string to turn it off.
+MODEL_RUNS_DB = os.environ.get("MODEL_RUNS_DB", os.path.join(LOG_DIR, "model_runs.duckdb"))
+MODEL_RUNS = ModelRunsWriter(MODEL_RUNS_DB)
+HOST_NAME = os.environ.get("HOST_NAME") or socket.gethostname()
+# models.model_info.name -> models.model_info.id, from GET /models at startup.
+MODEL_IDS: Dict[str, int] = {}
 
 def log_participation(round_id: str, challenge_name: str, model_container: str,
                       api_model_name: str, status: str, message: str = "",
@@ -215,6 +225,14 @@ def fetch_registered_models() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error fetching registered models: {e}")
         return []
+
+
+def remember_model_ids(registered_models: List[Dict[str, Any]]):
+    """Keep name -> numeric id so model_runs rows carry models.model_info.id directly.
+    Older api-portal versions omit `id`; the row then falls back to (user_id, model_name)."""
+    for m in registered_models:
+        if m.get("name") and isinstance(m.get("id"), int):
+            MODEL_IDS[m["name"]] = m["id"]
 
 
 def resolve_models(config: Dict[str, Any], registered_models: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
@@ -370,7 +388,8 @@ def extract_history_from_context(context_data: List[Dict[str, Any]]) -> Tuple[Li
 
 
 # --- Prediction ---
-def predict_with_model(model_name: str, histories: List[List[Dict[str, Any]]], horizon: int, freq: str) -> Optional[List[List[Dict[str, Any]]]]:
+def predict_with_model(model_name: str, histories: List[List[Dict[str, Any]]], horizon: int, freq: str,
+                       metrics_out: Optional[Dict[str, Any]] = None) -> Optional[List[List[Dict[str, Any]]]]:
     """
     Send predict request to Master Controller
     
@@ -380,6 +399,7 @@ def predict_with_model(model_name: str, histories: List[List[Dict[str, Any]]], h
                    [{"ts": "...", "value": ...}, ...]
         horizon: Number of prediction steps
         freq: Frequency string (e.g. "15min", "h", "D")
+        metrics_out: if given, filled with the controller's measurement of the call
     
     Returns:
         List of forecast lists or None on error
@@ -399,6 +419,8 @@ def predict_with_model(model_name: str, histories: List[List[Dict[str, Any]]], h
         resp = master_http_post("/predict", json_data=payload)
         result = resp.json() or {}
         preds = result.get("prediction")
+        if metrics_out is not None and isinstance(result.get("metrics"), dict):
+            metrics_out.update(result["metrics"])
 
         if not preds or not isinstance(preds, list):
             logger.warning(f"No valid prediction returned for model {model_name}")
@@ -683,21 +705,61 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
         logger.info(f"  Skipping {len(submitted)} model(s) already uploaded and "
                     f"{len(refused)} the platform refused for this round")
 
+    workload = {
+        "n_series": len(histories),
+        "horizon_steps": horizon_steps,
+        "freq": model_freq,
+        "context_points": sum(len(h) for h in histories),
+        "context_points_max": max(len(h) for h in histories),
+    }
+
     for container_name, api_model_name in pending:
         logger.info(f"  Creating predictions with container {container_name} for model {api_model_name}")
 
         t_start: Optional[float] = None
+        started_at = datetime.now(timezone.utc)
+        metrics: Dict[str, Any] = {}
+        predict_s: Optional[float] = None
+
+        def record_run(status: str, failed_stage: Optional[str] = None, error: str = ""):
+            # Best-effort by construction (models-25): runs after the upload attempt, and
+            # nothing in here may raise into the round.
+            try:
+                total_s = predict_s if predict_s is not None else (
+                    time.perf_counter() - t_start if t_start is not None else None)
+                MODEL_RUNS.record({
+                    **metrics, **workload,
+                    "round_id": int(round_id),
+                    "model_id": MODEL_IDS.get(container_name),
+                    "user_id": int(USER_ID) if USER_ID and str(USER_ID).isdigit() else None,
+                    "model_name": container_name,
+                    "config_name": api_model_name,
+                    "challenge_name": challenge_name,
+                    "attempt": retry,
+                    "started_at": started_at,
+                    "finished_at": started_at + timedelta(seconds=total_s or 0),
+                    "total_ms": int(round(total_s * 1000)) if total_s is not None else None,
+                    "status": status,
+                    "failed_stage": failed_stage,
+                    "error_message": error[:2000] or None,
+                    "host": HOST_NAME,
+                })
+            except Exception as e:
+                logger.error(f"Could not build model run record (forecast unaffected): {e}")
+
         try:
             # Predict uses container_name — measure inference time
             t_start = time.perf_counter()
-            predictions = predict_with_model(container_name, histories, horizon_steps, model_freq)
-            duration_s = time.perf_counter() - t_start
+            predictions = predict_with_model(container_name, histories, horizon_steps, model_freq,
+                                             metrics_out=metrics)
+            duration_s = predict_s = time.perf_counter() - t_start
 
             if not predictions:
                 logger.warning(f"  No predictions for container {container_name} ({duration_s:.2f}s)")
                 log_participation(str(round_id), challenge_name, container_name, api_model_name,
                                   "FAILURE", "Prediction returned None or invalid format",
                                   duration_s=duration_s)
+                record_run("FAILURE", "predict", "Prediction returned None or invalid format")
                 continue
 
             logger.info(f"  Prediction done in {duration_s:.2f}s ({container_name})")
@@ -717,6 +779,7 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
                 f"({result.get('probabilistic_points_inserted', '?')} with quantiles) "
                 f"across {len(forecasts)} series",
                 duration_s=duration_s)
+            record_run("SUCCESS")
 
         except UploadRejected as e:
             # Content the platform refused. Deterministic — do not re-attempt this round.
@@ -725,6 +788,7 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
             logger.error(f"Upload refused for {container_name}, not retrying this round: {e}")
             log_participation(str(round_id), challenge_name, container_name, api_model_name,
                               "FAILURE", f"refused: {e}", duration_s=duration_s)
+            record_run("FAILURE", "upload", f"refused: {e}")
 
         except Exception as e:
             duration_s = (time.perf_counter() - t_start) if t_start is not None else None
@@ -733,6 +797,7 @@ def process_challenge(challenge: Dict[str, Any], active_models: List[Tuple[str, 
             log_participation(str(round_id), challenge_name, container_name, api_model_name,
                               "FAILURE", f"{str(e)}\n{error_details}",
                               duration_s=duration_s)
+            record_run("FAILURE", "upload" if predict_s is not None else "predict", str(e))
 
     outstanding = [a for _, a in active_models if a not in submitted and a not in refused]
     if not outstanding:
@@ -793,6 +858,7 @@ def main_loop():
     # Model initialization
     config = load_config()
     registered_models = fetch_registered_models()
+    remember_model_ids(registered_models)
     logger.info(f"Registered models: {len(registered_models)} "
                 f"({', '.join(sorted(str(m.get('name')) for m in registered_models)) or 'none'})")
     active_models = resolve_models(config, registered_models)
@@ -892,6 +958,7 @@ def main_once():
     # Model initialization
     config = load_config()
     registered_models = fetch_registered_models()
+    remember_model_ids(registered_models)
     active_models = resolve_models(config, registered_models)
     
     if not active_models:
