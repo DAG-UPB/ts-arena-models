@@ -1,0 +1,22 @@
+services:
+  t0-template: &t0-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: t0
+    build:
+      context: ../model-services/t0
+      dockerfile: Dockerfile
+    profiles: ["t0", "all-models"]
+
+  t0-alpha:
+    <<: *t0-template
+    environment:
+      - MODEL_ID=theforecastingcompany/t0-alpha
+      - HF_HOME=/models/huggingface
+
+  t0-beta:
+    <<: *t0-template
+    environment:
+      - MODEL_ID=theforecastingcompany/t0-beta
+      - HF_HOME=/models/huggingface
