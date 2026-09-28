@@ -520,5 +520,33 @@
             "additionalProp1": {}
         },
         "organization_id": 13
+    },
+    "t0-alpha": {
+        "name": "theforecastingcompany/t0-alpha",
+        "model_type": "TSFM",
+        "model_family": "t0",
+        "model_size": 102,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "GIFT-Eval pretrain split (rebalanced) + synthetic data (kernel composition, causal graphs, covariate effects, mixup)",
+        "publishing_date": "2026-09-22",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
+    },
+    "t0-beta": {
+        "name": "theforecastingcompany/t0-beta",
+        "model_type": "TSFM",
+        "model_family": "t0",
+        "model_size": 256,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "GIFT-Eval pretrain split (rebalanced) + synthetic data (kernel composition, causal graphs, covariate effects, mixup)",
+        "publishing_date": "2026-09-22",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
     }
 }
