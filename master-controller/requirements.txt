@@ -7,3 +7,4 @@ uvicorn
 requests
 asyncpg
 psycopg2-binary
+nvidia-ml-py

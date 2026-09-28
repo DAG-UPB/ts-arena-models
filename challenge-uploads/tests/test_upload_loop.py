@@ -12,6 +12,7 @@ forecast used to be thrown away:
 """
 import importlib.util
 import os
+import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,6 +21,8 @@ import pytest
 import requests
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "main.py"
+# main.py imports its sibling modules the way `python src/main.py` finds them.
+sys.path.insert(0, str(SRC.parent))
 
 # The module creates its log directory at import time and defaults to /app/logs, which
 # only exists inside the container. Point it somewhere writable before importing.
