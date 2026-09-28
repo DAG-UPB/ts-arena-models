@@ -61,7 +61,6 @@ include:
   - compose/timesfm.yml
   - compose/moirai.yml
   - compose/time-moe.yml
-  - compose/moment.yml
   - compose/sundial.yml
   - compose/statistical.yml
   - compose/neuralforecast.yml
