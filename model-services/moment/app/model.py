@@ -55,9 +55,14 @@ class MomentModel:
 
         pipeline = self._get_pipeline(horizon)
         pipeline.to(device)
+        # Inference mode: no dropout, no gradient checkpointing. Left in training mode, the
+        # checkpointed forward goes through torch.compile, which on CUDA needs a C compiler
+        # the slim image does not have.
+        pipeline.eval()
         logger.debug(f"Horizon loaded in pipeline: {pipeline.head.linear.out_features}")
         # Forecast
-        outputs = pipeline.forecast(x_enc=context, input_mask=input_mask)
+        with torch.inference_mode():
+            outputs = pipeline.forecast(x_enc=context, input_mask=input_mask)
         forecast = outputs.forecast  # [batch_size, n_channels, forecast_horizon]
         logger.debug(f"Forecast shape: {forecast.shape}")
         # Convert back to [batch_size, forecast_horizon]
