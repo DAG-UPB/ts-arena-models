@@ -2,3 +2,4 @@ httpx
 requests
 python-dotenv
 isodate
+duckdb

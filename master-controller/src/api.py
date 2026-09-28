@@ -4,7 +4,8 @@ import logging
 import math
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union, Dict
+import time
+from typing import Any, List, Optional, Union, Dict
 from config import Config, setup_logging
 
 # ts-arena #15: configure the root logger before importing anything that logs at
@@ -12,7 +13,8 @@ from config import Config, setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-from worker import Worker, get_available_models
+from worker import Worker, client, get_available_models
+from metering import InferenceMeter
 
 compose_project_name = os.getenv("COMPOSE_PROJECT_NAME", "ts-models")
 
@@ -120,6 +122,10 @@ class ForecastItem(BaseModel):
 class PredictionResponse(BaseModel):
     model_name: str
     prediction: Union[List[ForecastItem], List[List[ForecastItem]]]
+    # What the call cost (see metering.py). Optional and additive: clients that only read
+    # `prediction` are unaffected. Every value may be None when it could not be measured;
+    # `metering_note` says why.
+    metrics: Optional[Dict[str, Any]] = None
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_batch(request: PredictionRequest):
@@ -149,24 +155,29 @@ async def predict_batch(request: PredictionRequest):
         }
 
         should_keep_alive = request.model_name in kept_alive_models
-        
+        worker = Worker(
+            service_name=f"{compose_project_name}-{request.model_name}-1",
+            base_url=f"http://{request.model_name}",
+            keep_alive=should_keep_alive
+        )
+        metrics = {"keep_alive": should_keep_alive, "container_start_ms": None}
+
         if should_keep_alive:
-             # Fast path: Model is already running managed by controller (via /start_model)
-             # Skip container start checks and health polling.
-             worker = Worker(
-                service_name=f"{compose_project_name}-{request.model_name}-1",
-                base_url=f"http://{request.model_name}",
-                keep_alive=True
-            )
-             prediction_result = worker.predict(data=prediction_data)
+            # Fast path: Model is already running managed by controller (via /start_model)
+            # Skip container start checks and health polling.
+            prediction_result, meter = _metered_predict(worker, prediction_data)
         else:
-            # Slow path: Lifecycle managed per request
-            with Worker(
-                service_name=f"{compose_project_name}-{request.model_name}-1",
-                base_url=f"http://{request.model_name}",
-                keep_alive=False
-            ) as worker:
-                prediction_result = worker.predict(data=prediction_data)
+            # Slow path: Lifecycle managed per request. start() returns once /health has
+            # answered, and /health runs a dummy prediction, so the weights are loaded and
+            # warm before the metered call below. The load is container_start_ms.
+            t_start = time.perf_counter()
+            worker.start()
+            metrics["container_start_ms"] = int(round((time.perf_counter() - t_start) * 1000))
+            try:
+                prediction_result, meter = _metered_predict(worker, prediction_data)
+            finally:
+                worker.stop()
+        metrics.update(meter.result)
 
         if prediction_result and "prediction" in prediction_result:
             predictions = prediction_result["prediction"]
@@ -179,7 +190,28 @@ async def predict_batch(request: PredictionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
     logger.info(f"Batch prediction for model '{request.model_name}' completed.")
-    return PredictionResponse(model_name=request.model_name, prediction=predictions)
+    logger.info(
+        f"Metered '{request.model_name}': inference {metrics.get('inference_ms')} ms, "
+        f"cpu {metrics.get('cpu_ms')} ms, gpu {metrics.get('gpu_energy_j')} J"
+        + (f" ({metrics['metering_note']})" if metrics.get("metering_note") else "")
+    )
+    return PredictionResponse(model_name=request.model_name, prediction=predictions,
+                              metrics=metrics)
+
+
+def _metered_predict(worker: Worker, data: dict):
+    """Run the prediction inside an InferenceMeter. Metering never raises; the
+    prediction's own exceptions propagate unchanged."""
+    container = worker.container
+    if container is None:
+        try:
+            container = client.containers.get(worker.service_name)
+        except Exception as e:
+            logger.warning(f"Metering: cannot look up container '{worker.service_name}': {e}")
+    meter = InferenceMeter(container)
+    with meter:
+        result = worker.predict(data=data)
+    return result, meter
 
 @app.get("/health")
 def health_check():

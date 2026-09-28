@@ -4,11 +4,14 @@ services:
   master-controller-api:
     environment:
       - GPU_ENABLED=true
+    # The controller runs no CUDA itself. It sees every GPU so it can meter the one a model
+    # container is actually pinned to (compose/base.yml), whatever GPU_ID says. NVML
+    # queries create no context and allocate no GPU memory.
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['${GPU_ID}']
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, utility]
 
