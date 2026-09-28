@@ -73,6 +73,7 @@ include:
   - compose/tabpfn-ts.yml
   - compose/toto.yml
   - compose/toto2.yml
+  - compose/t0.yml
 
 volumes:
   arena-db:

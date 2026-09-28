@@ -1,0 +1,18 @@
+# Pinned 2026-09-28 to the versions verified locally with both checkpoints.
+# Floating specifiers let a cold rebuild jump major versions and silently change
+# model behaviour (models #21). Bump deliberately, then rebuild and test.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.13.0
+python-dateutil==2.9.0.post0
+# t0-beta needs >=0.5.0.
+tfc-t0==0.5.0
+numpy==2.5.3
+huggingface-hub==2.0.0
+safetensors==0.8.0
+
+# Transitive deps of tfc-t0, pinned explicitly.
+einops==0.8.2
+jaxtyping==0.3.11
+rotary-embedding-torch==0.9.1
