@@ -9,8 +9,8 @@ Writing is strictly best-effort. A forecast must never be lost because this file
 missing, locked, full or corrupt, so `record()` catches every exception, logs it, and
 returns. The file is opened per write and closed straight after: an analyst can read it
 between writes, and a lock held by someone else fails at once instead of blocking the round.
-DuckDB allows one writer; open the file with `read_only=True` (or query a copy) while the
-uploader runs.
+Any other open connection, read-only included, makes writes fail for as long as it is held,
+so analysis should run on a copy of the file.
 """
 import logging
 import uuid

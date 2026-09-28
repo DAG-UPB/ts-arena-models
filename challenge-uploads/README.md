@@ -86,11 +86,11 @@ It also holds the workload shape (series, horizon, context points) and the outco
   energy figure includes its work.
 - The file is never pruned. Writes are best-effort: a missing, locked or corrupt file is
   logged and never affects a forecast.
-- DuckDB allows one writer. Open the file read-only while the service runs:
+- DuckDB locks the whole file, and any open connection (read-only too) blocks the
+  service's writes, so rows written meanwhile are lost. Query a copy instead:
 
-  ```python
-  import duckdb
-  duckdb.connect("logs/challenge-uploads/model_runs.duckdb", read_only=True)
+  ```bash
+  cp logs/challenge-uploads/model_runs.duckdb /tmp/model_runs.duckdb
   ```
 
 ## Example Output
