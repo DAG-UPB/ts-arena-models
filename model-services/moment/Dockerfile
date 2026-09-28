@@ -4,6 +4,12 @@ WORKDIR /app
 
 COPY requirements.txt .
 
+# torch 2.13 on CUDA routes some degenerate matmul shapes (e.g. a context of a single patch,
+# as in the /health probe) to a Triton kernel. Triton builds a small C helper on first use,
+# so the image needs a C compiler; without one those calls fail and /health returns 503.
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # torch MUST come from the CUDA 12.6 index. The default PyPI wheel for 2.13.0 is +cu130,
 # built against CUDA 13, which needs driver >= 580. proteus runs 535 (CUDA 12.2), so the
 # cu130 build fails CUDA init with only a UserWarning, torch.cuda.is_available() returns
