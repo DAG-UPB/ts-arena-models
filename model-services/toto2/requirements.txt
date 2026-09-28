@@ -1,0 +1,22 @@
+# Pinned 2026-09-28 to the versions in the image benchmarked on proteus GPU 0.
+# Floating specifiers let a cold rebuild jump major versions and silently change
+# model behaviour (models #21). Bump deliberately, then rebuild and test.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.13.0
+python-dateutil==2.9.0.post0
+toto-2==2.0.0
+numpy==2.2.6
+huggingface-hub==0.36.2
+safetensors==0.8.0
+
+# Transitive numeric/ML stack of toto-2, pinned explicitly.
+einops==0.8.2
+gluonts==0.17.0
+jaxtyping==0.3.11
+dd-unit-scaling==0.1.0
+unit-scaling==0.3.5
+scipy==1.18.1
+pandas==2.3.3
+lightning==2.6.6

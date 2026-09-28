@@ -1,0 +1,34 @@
+services:
+  toto2-template: &toto2-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: toto2
+    build:
+      context: ../model-services/toto2
+      dockerfile: Dockerfile
+    profiles: ["toto2", "all-models"]
+
+  toto-2.0-4m:
+    <<: *toto2-template
+    environment:
+      - MODEL_ID=Datadog/Toto-2.0-4m
+      - HF_HOME=/models/huggingface
+
+  toto-2.0-22m:
+    <<: *toto2-template
+    environment:
+      - MODEL_ID=Datadog/Toto-2.0-22m
+      - HF_HOME=/models/huggingface
+
+  toto-2.0-313m:
+    <<: *toto2-template
+    environment:
+      - MODEL_ID=Datadog/Toto-2.0-313m
+      - HF_HOME=/models/huggingface
+
+  toto-2.0-2.5b:
+    <<: *toto2-template
+    environment:
+      - MODEL_ID=Datadog/Toto-2.0-2.5B
+      - HF_HOME=/models/huggingface

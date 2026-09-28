@@ -461,5 +461,61 @@
             "additionalProp1": {}
         },
         "organization_id": 12
+    },
+    "toto-2.0-4m": {
+        "name": "Datadog/Toto-2.0-4m",
+        "model_type": "TSFM",
+        "model_family": "toto",
+        "model_size": 4,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Datadog observability metrics + synthetic data (no public forecasting data)",
+        "publishing_date": "2026-05-19",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 13
+    },
+    "toto-2.0-22m": {
+        "name": "Datadog/Toto-2.0-22m",
+        "model_type": "TSFM",
+        "model_family": "toto",
+        "model_size": 22,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Datadog observability metrics + synthetic data (no public forecasting data)",
+        "publishing_date": "2026-05-19",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 13
+    },
+    "toto-2.0-313m": {
+        "name": "Datadog/Toto-2.0-313m",
+        "model_type": "TSFM",
+        "model_family": "toto",
+        "model_size": 313,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Datadog observability metrics + synthetic data (no public forecasting data)",
+        "publishing_date": "2026-05-19",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 13
+    },
+    "toto-2.0-2.5b": {
+        "name": "Datadog/Toto-2.0-2.5B",
+        "model_type": "TSFM",
+        "model_family": "toto",
+        "model_size": 2500,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Datadog observability metrics + synthetic data (no public forecasting data)",
+        "publishing_date": "2026-05-19",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 13
     }
 }
