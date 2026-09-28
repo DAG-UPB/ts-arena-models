@@ -9,6 +9,9 @@ COPY requirements.txt .
 # cu130 build fails CUDA init with only a UserWarning, torch.cuda.is_available() returns
 # False and the model silently runs on CPU. Same version, different CUDA build:
 # requirements.txt's torch==2.13.0 is satisfied by 2.13.0+cu126, so the pinned set is unchanged.
+# python:3.10-slim ships a pip too old for the PyTorch index (it rejects the
+# typing_extensions metadata there and falls back to a source build that fails).
+RUN pip install --no-cache-dir --upgrade "pip>=25"
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
         torch==2.13.0
 
