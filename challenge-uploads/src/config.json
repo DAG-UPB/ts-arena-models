@@ -548,5 +548,33 @@
             "additionalProp1": {}
         },
         "organization_id": 28
+    },
+    "kairos-50m": {
+        "name": "mldi-lab/Kairos_50m",
+        "model_type": "TSFM",
+        "model_family": "kairos",
+        "model_size": 50,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "PreSTS corpus (300B+ points): real-world series from diverse domains, stratified by predictability, plus synthetic data; GIFT-Eval and TSLib test sets excluded",
+        "publishing_date": "2025-09-30",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
+    },
+    "kairos-10m": {
+        "name": "mldi-lab/Kairos_10m",
+        "model_type": "TSFM",
+        "model_family": "kairos",
+        "model_size": 10,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "PreSTS corpus (300B+ points): real-world series from diverse domains, stratified by predictability, plus synthetic data; GIFT-Eval and TSLib test sets excluded",
+        "publishing_date": "2025-09-30",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
     }
 }
