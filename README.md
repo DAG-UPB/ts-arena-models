@@ -133,7 +133,7 @@ After the quantile audit (issue models #13 / models #3), the per-model status is
 
 - **Point-only (`{}`):** `time-moe`, `moment`, `tinytimemixer`, `tinytimemixer-r1`.
 - **Residual-based quantiles** (statistical baselines, derived from point forecast residuals): `naive-forecast`, `seasonal-average`, `simple-moving-average`.
-- **Model-native or sample-based quantiles:** `chronos`, `timesfm`, `timesfm2_5`, `moirai`, `moirai2`, `sundial`, `tabpfn-ts`, `tirex`, `flowstate`, `toto`, `toto2`, `t0`, `visionts`.
+- **Model-native or sample-based quantiles:** `chronos`, `timesfm`, `timesfm2_5`, `moirai`, `moirai2`, `sundial`, `tabpfn-ts`, `tirex`, `flowstate`, `toto`, `toto2`, `t0`, `tabby`, `visionts`.
 
 Sample-based models are intentionally **unseeded**, so their quantile values vary run-to-run. The conformance harness therefore checks the *structure* and *invariants* of `probabilistic_values`, not exact numeric values (see issue models #3 for the rationale).
 

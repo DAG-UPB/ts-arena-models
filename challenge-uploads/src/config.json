@@ -548,5 +548,19 @@
             "additionalProp1": {}
         },
         "organization_id": 28
+    },
+    "tabby": {
+        "name": "paris-noah/Tabby",
+        "model_type": "TSFM",
+        "model_family": "tabby",
+        "model_size": 146,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2)",
+        "publishing_date": "2026-09-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
     }
 }
