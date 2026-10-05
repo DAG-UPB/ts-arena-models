@@ -1,0 +1,13 @@
+# Pinned to the versions of the image tested end to end (GPU, via master-controller).
+# torch is installed separately in the Dockerfile from the CUDA 12.4 index.
+einops==0.8.2
+fastapi==0.142.2
+huggingface_hub==1.33.0
+numpy==2.4.6
+pandas==3.0.6
+pydantic==2.13.5
+python-dateutil==2.9.0.post0
+requests==2.34.2
+safetensors==0.8.0
+transformers==5.18.0
+uvicorn==0.54.0

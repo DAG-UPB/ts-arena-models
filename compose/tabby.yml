@@ -1,0 +1,14 @@
+services:
+  tabby:
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tabby
+    build:
+      context: ../model-services/tabby
+      dockerfile: Dockerfile
+    profiles: ["tabby", "all-models"]
+    environment:
+      - MODEL_ID=paris-noah/Tabby
+      - HF_HOME=/models/huggingface
+      - TABBY_MAX_CONTEXT=8192
