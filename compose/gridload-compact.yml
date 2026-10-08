@@ -1,0 +1,11 @@
+services:
+  gridload-compact:
+    image: gridload-compact
+    build:
+      context: ../model-services/gridload-compact
+      dockerfile: Dockerfile
+    profiles: ["gridload-compact", "all-models"]
+    labels:
+      - managed.by=controller
+    networks:
+      - internal

@@ -548,5 +548,19 @@
             "additionalProp1": {}
         },
         "organization_id": 28
+    },
+    "gridload-compact": {
+        "name": "sankalpsthakur/gridload-compact",
+        "model_type": "Specialist",
+        "model_family": "gridload-compact",
+        "model_size": 0,
+        "hosting": "UPB",
+        "architecture": "MLP quantile nets (3-seed ensemble per frequency)",
+        "pretraining_data": "SMARD net-load history 2018 to 2026-02 (CC BY 4.0), public data only; no third-party model weights",
+        "publishing_date": "2026-10-07",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": null
     }
 }
