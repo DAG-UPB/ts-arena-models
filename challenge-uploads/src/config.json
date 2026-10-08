@@ -561,7 +561,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 31
     },
     "kairos-10m": {
         "name": "mldi-lab/Kairos_10m",
@@ -575,7 +575,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 31
     },
     "tabby": {
         "name": "paris-noah/Tabby",
