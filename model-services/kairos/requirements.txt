@@ -1,0 +1,15 @@
+# Pinned 2026-09-30 to the versions verified locally with Kairos_50m and Kairos_10m.
+# Bump deliberately, then rebuild and test (models #21).
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.13.0
+python-dateutil==2.9.0.post0
+numpy==2.5.3
+# The vendored T5 stack is a copy of transformers 4.56's; 5.x breaks it.
+transformers==4.56.2
+huggingface-hub==0.36.2
+safetensors==0.8.0
+tokenizers==0.22.2
+einops==0.8.2
+jaxtyping==0.3.11

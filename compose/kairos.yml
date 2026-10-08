@@ -1,0 +1,22 @@
+services:
+  kairos-template: &kairos-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: kairos
+    build:
+      context: ../model-services/kairos
+      dockerfile: Dockerfile
+    profiles: ["kairos", "all-models"]
+
+  kairos-50m:
+    <<: *kairos-template
+    environment:
+      - MODEL_ID=mldi-lab/Kairos_50m
+      - HF_HOME=/models/huggingface
+
+  kairos-10m:
+    <<: *kairos-template
+    environment:
+      - MODEL_ID=mldi-lab/Kairos_10m
+      - HF_HOME=/models/huggingface
