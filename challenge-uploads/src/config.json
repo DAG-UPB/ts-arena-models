@@ -581,14 +581,28 @@
         "name": "paris-noah/Tabby",
         "model_type": "TSFM",
         "model_family": "tabby",
-        "model_size": 146,
+        "model_size": 147,
         "hosting": "UPB",
         "architecture": "encoder-only",
-        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2)",
+        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2); prompt tuned on 48 GIFT-Eval training tasks, backbone frozen",
         "publishing_date": "2026-09-12",
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 29
+    },
+    "tabby-pretrain": {
+        "name": "paris-noah/Tabby-Pretrain",
+        "model_type": "TSFM",
+        "model_family": "tabby",
+        "model_size": 146,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2); zero-shot backbone, no prompt",
+        "publishing_date": "2026-09-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 29
     }
 }

@@ -1,72 +1,113 @@
 from __future__ import annotations
 
+# --- logging (ts-arena #15) ---------------------------------------------
+# Configure the ROOT logger, not just this module's. Left unconfigured, root keeps
+# its default level WARNING with no handler at all: every logger.info() below is
+# dropped before the record is even built, and WARNING+ escapes through
+# logging.lastResort as bare text with no timestamp, no level and no logger name.
+# That is the defect that hid the ELO job for ten days in backend #75. Format and
+# LOG_LEVEL semantics match ts-arena-backend's logging_setup.py so the whole fleet
+# reads alike. Must stay above the `.model` import, which logs at import time.
+import logging
+import os
+import sys
+import time
+
+_LOG_LEVELS = {"CRITICAL": logging.CRITICAL, "FATAL": logging.CRITICAL,
+               "ERROR": logging.ERROR, "WARNING": logging.WARNING,
+               "WARN": logging.WARNING, "INFO": logging.INFO,
+               "DEBUG": logging.DEBUG}
+logging.Formatter.converter = time.gmtime  # asctime in UTC, hence the trailing Z
+logging.basicConfig(
+    level=_LOG_LEVELS.get(os.getenv("LOG_LEVEL", "").strip().upper(), logging.INFO),
+    format="%(asctime)sZ | %(levelname)s | %(name)s | %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
+# ------------------------------------------------------------------------
+
+from typing import Dict, List, Optional, Union
+from datetime import datetime, timedelta
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Union, Dict, Optional
-from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from dateutil import parser as date_parser
+
 from .model import TabbyModel
+
 
 class HistoryItem(BaseModel):
     ts: str
-    value: float
+    value: Optional[float] = None
+
 
 class PredictionRequest(BaseModel):
     history: Union[List[List[HistoryItem]], List[HistoryItem]]
     horizon: int
     freq: Optional[str] = "h"
 
+
 class ForecastItem(BaseModel):
     ts: str
     value: float
     probabilistic_values: Dict[str, float] = {}
 
+
 class PredictionResponse(BaseModel):
     prediction: Union[List[ForecastItem], List[List[ForecastItem]]]
-
-
-def parse_timestamp(ts_str: str) -> datetime:
-    """Parse timestamp string handling various formats."""
-    return date_parser.parse(ts_str)
 
 
 def generate_future_timestamps(last_timestamp: datetime, horizon: int, freq: str) -> List[str]:
     """Generate future timestamps based on the last known timestamp"""
     timestamps = []
     for i in range(1, horizon + 1):
-        if freq == "h":
-            new_ts = last_timestamp + timedelta(hours=i)
-        elif freq == "15min" or freq == "15T":
-            new_ts = last_timestamp + timedelta(minutes=15 * i)
-        elif freq == "30min" or freq == "30T":
-            new_ts = last_timestamp + timedelta(minutes=30 * i)
-        elif freq == "d" or freq == "D":
-            new_ts = last_timestamp + timedelta(days=i)
-        elif freq == "w" or freq == "W":
-            new_ts = last_timestamp + timedelta(weeks=i)
-        elif freq == "m" or freq == "M":
-            new_ts = last_timestamp + relativedelta(months=i)
+        if freq == "1min":
+            next_time = last_timestamp + timedelta(minutes=1 * i)
+        elif freq == "15min":
+            next_time = last_timestamp + timedelta(minutes=15 * i)
+        elif freq == "30min":
+            next_time = last_timestamp + timedelta(minutes=30 * i)
+        elif freq == "h":
+            next_time = last_timestamp + timedelta(hours=i)
+        elif freq == "D":
+            next_time = last_timestamp + timedelta(days=i)
+        elif freq == "W":
+            next_time = last_timestamp + timedelta(weeks=i)
+        elif freq == "M":
+            next_time = last_timestamp + relativedelta(months=i)
         else:
-            new_ts = last_timestamp + timedelta(hours=i)
-        timestamps.append(new_ts.isoformat())
+            next_time = last_timestamp + timedelta(hours=i)
+
+        if freq in ["D", "W", "M"]:
+            next_time = next_time.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        timestamps.append(next_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
     return timestamps
 
 
 def create_forecast_items(
-    timestamps: List[str], 
-    values: List[float], 
-    quantiles_dict: Dict[str, List[float]] = None
+    timestamps: List[str],
+    values: List[float],
+    quantiles_dict: Dict[str, List[float]] = None,
 ) -> List[ForecastItem]:
-    """Create ForecastItem objects from timestamps, values, and quantiles."""
-    items = []
+    """Create ForecastItem list from timestamps, values, and optional quantiles"""
+    forecasts = []
     for i, (ts, val) in enumerate(zip(timestamps, values)):
-        prob_values = {}
+        probabilistic_values = {}
         if quantiles_dict:
-            for q_level, q_values in quantiles_dict.items():
-                prob_values[q_level] = q_values[i] if i < len(q_values) else q_values[-1]
-        items.append(ForecastItem(ts=ts, value=val, probabilistic_values=prob_values))
-    return items
+            for level, quantile_values in quantiles_dict.items():
+                if i < len(quantile_values):
+                    probabilistic_values[f"q_{level}"] = float(quantile_values[i])
+
+        forecasts.append(
+            ForecastItem(
+                ts=ts,
+                value=float(val),
+                probabilistic_values=probabilistic_values,
+            )
+        )
+    return forecasts
 
 
 app = FastAPI()
@@ -75,55 +116,66 @@ model = TabbyModel()
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
-    try:
-        # Check if batch or single series
-        is_batch = isinstance(request.history[0], list)
-        
-        if is_batch:
-            # Batch prediction
-            history_dicts = [
-                [{"ts": item.ts, "value": item.value} for item in series]
-                for series in request.history
-            ]
-            
-            result = model.predict(
-                history=history_dicts,
-                horizon=request.horizon,
-                freq=request.freq
+    if not request.history:
+        raise HTTPException(status_code=400, detail="History cannot be empty")
+
+    freq = request.freq or "h"
+    is_batch = isinstance(request.history[0], list)
+
+    if is_batch:
+        model_input = []
+        last_timestamps = []
+        for series in request.history:
+            series_data = [{"ts": item.ts, "value": item.value} for item in series]
+            model_input.append(series_data)
+            last_ts = datetime.fromisoformat(
+                series[-1].ts.replace("Z", "+00:00").replace("+00:00", "")
             )
-            
-            all_predictions = []
-            for idx, series in enumerate(request.history):
-                last_ts = parse_timestamp(series[-1].ts)
-                future_timestamps = generate_future_timestamps(last_ts, request.horizon, request.freq)
-                forecasts = result["forecasts"][idx]
-                quantiles = result["quantiles"][idx] if result.get("quantiles") else None
-                forecast_items = create_forecast_items(future_timestamps, forecasts, quantiles)
-                all_predictions.append(forecast_items)
-            
-            return PredictionResponse(prediction=all_predictions)
-        else:
-            # Single series prediction
-            history_dicts = [{"ts": item.ts, "value": item.value} for item in request.history]
-            
-            result = model.predict(
-                history=history_dicts,
-                horizon=request.horizon,
-                freq=request.freq
-            )
-            
-            last_ts = parse_timestamp(request.history[-1].ts)
-            future_timestamps = generate_future_timestamps(last_ts, request.horizon, request.freq)
-            forecasts = result["forecasts"]
-            quantiles = result.get("quantiles")
-            forecast_items = create_forecast_items(future_timestamps, forecasts, quantiles)
-            
-            return PredictionResponse(prediction=forecast_items)
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            last_timestamps.append(last_ts)
+
+        result = model.predict(model_input, request.horizon, freq)
+
+        all_forecasts = []
+        for i, last_ts in enumerate(last_timestamps):
+            future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
+            pred_values = result["forecasts"][i]
+            # quantiles come back as a list of dicts (one per series)
+            quantiles_list = result.get("quantiles", [])
+            quantiles_dict = quantiles_list[i] if i < len(quantiles_list) else None
+            forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
+            all_forecasts.append(forecasts)
+
+        return {"prediction": all_forecasts}
+    else:
+        model_input = [{"ts": item.ts, "value": item.value} for item in request.history]
+        last_ts = datetime.fromisoformat(
+            request.history[-1].ts.replace("Z", "+00:00").replace("+00:00", "")
+        )
+
+        result = model.predict(model_input, request.horizon, freq)
+
+        future_ts = generate_future_timestamps(last_ts, request.horizon, freq)
+        pred_values = result["forecasts"]
+        quantiles_dict = result.get("quantiles")
+        forecasts = create_forecast_items(future_ts, pred_values, quantiles_dict)
+
+        return {"prediction": forecasts}
 
 
 @app.get("/health")
-def health():
-    return {"status": "healthy", "model": "tabby"}
+async def health_check():
+    try:
+        now = datetime.now()
+        data = [
+            {"ts": (now - timedelta(hours=i)).isoformat() + "Z", "value": float(i)}
+            for i in range(10, 0, -1)
+        ]
+        result = model.predict(data, horizon=1, freq="h")
+        if result is not None and "forecasts" in result:
+            return {"status": "healthy", "model": "ready"}
+        else:
+            logger.error("Model returned None or invalid result")
+            raise HTTPException(status_code=503, detail="Model not ready")
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Service unhealthy: {e}")
