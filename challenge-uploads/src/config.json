@@ -549,6 +549,62 @@
         },
         "organization_id": 28
     },
+    "kairos-50m": {
+        "name": "mldi-lab/Kairos_50m",
+        "model_type": "TSFM",
+        "model_family": "kairos",
+        "model_size": 50,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "PreSTS corpus (300B+ points): real-world series from diverse domains, stratified by predictability, plus synthetic data; GIFT-Eval and TSLib test sets excluded",
+        "publishing_date": "2025-09-30",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 31
+    },
+    "kairos-10m": {
+        "name": "mldi-lab/Kairos_10m",
+        "model_type": "TSFM",
+        "model_family": "kairos",
+        "model_size": 10,
+        "hosting": "UPB",
+        "architecture": "encoder-decoder",
+        "pretraining_data": "PreSTS corpus (300B+ points): real-world series from diverse domains, stratified by predictability, plus synthetic data; GIFT-Eval and TSLib test sets excluded",
+        "publishing_date": "2025-09-30",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 31
+    },
+    "tabby": {
+        "name": "paris-noah/Tabby",
+        "model_type": "TSFM",
+        "model_family": "tabby",
+        "model_size": 147,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2); prompt tuned on 48 GIFT-Eval training tasks, backbone frozen",
+        "publishing_date": "2026-09-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 29
+    },
+    "tabby-pretrain": {
+        "name": "paris-noah/Tabby-Pretrain",
+        "model_type": "TSFM",
+        "model_family": "tabby",
+        "model_size": 146,
+        "hosting": "UPB",
+        "architecture": "encoder-only",
+        "pretraining_data": "GIFT-Eval-Pretrain+, BLAST, synthetic (KernelSynth, CauKerV2); zero-shot backbone, no prompt",
+        "publishing_date": "2026-09-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 29
+    },
     "gridload-compact": {
         "name": "sankalpsthakur/gridload-compact",
         "model_type": "Specialist",

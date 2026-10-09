@@ -1,0 +1,22 @@
+services:
+  tabby-template: &tabby-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: tabby
+    build:
+      context: ../model-services/tabby
+      dockerfile: Dockerfile
+    profiles: ["tabby", "all-models"]
+
+  tabby:
+    <<: *tabby-template
+    environment:
+      - MODEL_ID=paris-noah/Tabby
+      - HF_HOME=/models/huggingface
+
+  tabby-pretrain:
+    <<: *tabby-template
+    environment:
+      - MODEL_ID=paris-noah/Tabby-Pretrain
+      - HF_HOME=/models/huggingface
