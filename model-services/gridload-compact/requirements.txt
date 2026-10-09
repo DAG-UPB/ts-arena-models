@@ -1,0 +1,7 @@
+# Pinned to the versions the service was tested with (2026-10-07, python 3.12, macOS arm64 and the repository's harness).
+# No torch in the image: the two nets are served through onnxruntime on 1 thread.
+fastapi==0.142.2
+uvicorn==0.54.0
+pydantic==2.13.5
+numpy==2.5.3
+onnxruntime==1.30.0

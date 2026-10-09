@@ -1,0 +1,30 @@
+{
+ "freq": 15,
+ "spec_kwargs": {
+  "J": 96,
+  "dmeans": 10
+ },
+ "n_nets": 3,
+ "spread": 1.05,
+ "params": 77451,
+ "params_per_net": 25817,
+ "fp32_bytes": 344362,
+ "int8_bytes": 144175,
+ "state_dict_bytes": 309804,
+ "members": [
+  {
+   "file": "test_15_s0.pt",
+   "sha256": "d0b03c3ef63ffabd3639ca1f087d9b0ab3183fe1f51d863be716c0c57bd11a4d"
+  },
+  {
+   "file": "test_15_s1.pt",
+   "sha256": "1edff5f7cadfda4756d27f2ae434479d347c75726cb85d0d7e60fe535eb8153d"
+  },
+  {
+   "file": "test_15_s2.pt",
+   "sha256": "4e67a872b20ac42254252a7d1450bb8069f94dcbc8962ab9b46504f5efffb0bb"
+  }
+ ],
+ "fp32_sha256": "81e7e6b9f9c850d6ed04b1f8b83c50de77a9a419655eb14190cdf25a7dbce3e4",
+ "int8_sha256": "1e1dfaca195e8cb5d8977739bf7b91e34c8ab99d8275b39e9297988f65ed1622"
+}

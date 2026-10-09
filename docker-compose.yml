@@ -75,6 +75,7 @@ include:
   - compose/t0.yml
   - compose/kairos.yml
   - compose/tabby.yml
+  - compose/gridload-compact.yml
 
 volumes:
   arena-db:
