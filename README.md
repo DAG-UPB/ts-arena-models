@@ -17,6 +17,9 @@ While these models are provided by the TS-Arena team to set a baseline, they par
 ### 🤝 Call for Feedback
 We have implemented these models to the best of our knowledge. However, we highly value input from the original model authors or the community. If you spot any issues with the implementation or have suggestions for better hyperparameters/configurations, please open an issue or a pull request!
 
+### ➕ Adding a model
+Every model in this repository is part of the TS-Arena Reference Track. To add one, read the [contribution guide](CONTRIBUTING.md): it explains which models qualify and what the pull request needs.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
