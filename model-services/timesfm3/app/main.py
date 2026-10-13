@@ -89,7 +89,7 @@ def create_forecast_items(timestamps: List[str], values: List[float]) -> List[Fo
     ]
 
 
-# The nine deciles the arena's probabilistic contract asks for (see the repo README,
+# The nine deciles the arena's probabilistic contract asks for (see CONTRIBUTING.md,
 # "Probabilistic forecasts"). TimesFM 3.0's checkpoint happens to predict exactly
 # these, but we resolve them by level rather than by position: the 2.5 head returned
 # ten columns with the mean at index 0, so an assumed offset is a silent, whole-model

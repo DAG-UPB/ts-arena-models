@@ -62,6 +62,17 @@ through the API.
 - **Non-commercial licenses are fine.** State the license of the code and of the weights in
   your pull request.
 
+## Repository structure
+
+- **`model-services/`**: one container implementation per model, plus `tests/` with the
+  forecast contract checks.
+- **`compose/`**: one compose file per model family.
+- **`master-controller/`**: starts model containers on demand and forwards prediction requests.
+- **`challenge-uploads/`**: polls open challenge rounds, gets forecasts from the master
+  controller and uploads them. `src/config.json` lists every model.
+- **`example/`**: compose files for running the models locally without taking part in
+  challenges.
+
 ## Adding a model
 
 Start from an existing service. `model-services/t0` installs the model as a pip package,
@@ -76,7 +87,7 @@ and ships two variants.
 | `compose/<name>.yml` | One service per variant. Extends `gpu-model-base` from `compose/base.yml`, sets `MODEL_ID`, profiles `["<name>", "all-models"]` |
 | `docker-compose.yml` | Include `compose/<name>.yml` |
 | `challenge-uploads/src/config.json` | One entry per variant |
-| `README.md` | Add the model to the list under "Which models emit quantiles" |
+| `CONTRIBUTING.md` | Add the model to the list under "Which models emit quantiles" |
 
 The compose service name and the `config.json` key are the same string, for example
 `kairos-50m`. The master controller uses it to start the container and reach the service. Use
@@ -121,13 +132,43 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
   series, exactly `horizon` points each, with timestamps continuing from that series' last
   timestamp at the given frequency.
 
-### Forecast output
+### Probabilistic forecasts
 
-Each forecast point is `{"ts", "value", "probabilistic_values"}`. `probabilistic_values` holds
-the nine deciles `q_0.1` to `q_0.9`, or is `{}` for a point-only model. Values must be finite,
-the deciles must not decrease, and `value` must equal `q_0.5`. The full contract is in the
-README under "Probabilistic forecasts"; `model-services/tests/quantile_contract.py` checks it
-with `validate_response`.
+Forecasts may carry predictive quantiles in addition to the point `value`. Every forecast point
+looks like this:
+
+```json
+{
+  "ts": "2025-01-01T00:00:00Z",
+  "value": 42.0,
+  "probabilistic_values": {
+    "q_0.1": 38.5, "q_0.2": 39.8, "q_0.3": 40.7,
+    "q_0.4": 41.4, "q_0.5": 42.0, "q_0.6": 42.6,
+    "q_0.7": 43.3, "q_0.8": 44.2, "q_0.9": 45.5
+  }
+}
+```
+
+- `probabilistic_values` holds the nine deciles `q_0.1` to `q_0.9` and no other keys.
+- A point-only model returns `{}`.
+- Values are finite (no `NaN`, no infinity).
+- The deciles do not decrease: `q_0.1 <= q_0.2 <= ... <= q_0.9`.
+- `value` equals the median `q_0.5`.
+- Within one series, either every point has quantiles or none has.
+
+`model-services/tests/quantile_contract.py` checks these rules with `validate_response`.
+
+Sample-based models are intentionally not seeded, so their quantiles vary from run to run. The
+checks therefore test structure and the rules above, never exact values.
+
+#### Which models emit quantiles
+
+- **Point-only (`{}`):** `time-moe`, `moment`, `tinytimemixer`, `tinytimemixer-r1`.
+- **Residual-based quantiles** (statistical baselines, derived from the residuals of the point
+  forecast): `naive-forecast`, `seasonal-average`, `simple-moving-average`.
+- **Model-native or sample-based quantiles:** `chronos`, `timesfm`, `timesfm2_5`, `moirai`,
+  `moirai2`, `sundial`, `tabpfn-ts`, `tirex`, `flowstate`, `toto`, `toto2`, `t0`, `kairos`,
+  `tabby`, `visionts`.
 
 ### Every live challenge
 
@@ -164,6 +205,27 @@ uv run model-services/tests/run_harness.py --url http://localhost:8001/predict -
 ```
 
 All runs must print `PASS`.
+
+## Running the whole stack
+
+You do not need this to add a model; the harness above is enough. It runs all models the way
+they run in the arena, and it takes part in live challenges under your account.
+
+Copy `.env.example` to `.env` and fill it in. `API_UPLOAD_KEY` is an API key from the
+[console](https://console.ts-arena.live); gated Hugging Face models need `HF_READ_TOKEN`. Then
+create all model containers without starting them, and start the controller and the challenge
+uploads:
+
+```bash
+docker compose --profile all-models -f docker-compose.yml -f docker-compose.gpu.yml up --build -d --no-start
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
+```
+
+On macOS use `docker-compose.macos.yml` instead of `docker-compose.gpu.yml`; on a machine
+without a GPU leave the overlay out. The GPU overlay needs the nvidia-container-toolkit, and
+`GPU_ID` in `.env` selects the GPU (`0` or `all`). The controller starts model containers only
+when a challenge needs them, which keeps memory use low. To run the models locally without
+taking part in challenges, use the compose files in `example/`.
 
 ## Your pull request
 
