@@ -604,5 +604,19 @@
             "additionalProp1": {}
         },
         "organization_id": 29
+    },
+    "t0-gamma": {
+        "name": "theforecastingcompany/t0-gamma",
+        "model_type": "TSFM",
+        "model_family": "t0",
+        "model_size": 256,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Uniform weight average of five fine-tunes of one shared t0 base checkpoint, each on a different training-data recipe (not disclosed)",
+        "publishing_date": "2026-10-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 28
     }
 }

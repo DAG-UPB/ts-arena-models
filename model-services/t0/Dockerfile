@@ -2,7 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# requirements-gamma.txt for t0-gamma; alpha and beta use the default.
+ARG REQUIREMENTS=requirements.txt
+COPY ${REQUIREMENTS} requirements.txt
 
 # torch MUST come from the CUDA 12.6 index: the default PyPI wheel is built against
 # CUDA 13, which proteus' driver 535 cannot init, so the model would silently run on

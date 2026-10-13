@@ -1,0 +1,17 @@
+# t0-gamma only (models-33). Same pins as requirements.txt except tfc-t0: gamma needs
+# >=0.6.0, but 0.6.0 changes how t0-alpha and t0-beta treat missing values, so those
+# two stay on requirements.txt. Bump deliberately, then rebuild and test.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.13.0
+python-dateutil==2.9.0.post0
+tfc-t0[torch]==0.6.0
+numpy==2.5.3
+huggingface-hub==2.0.0
+safetensors==0.8.0
+
+# Transitive deps of tfc-t0, pinned explicitly.
+einops==0.8.2
+jaxtyping==0.3.11
+rotary-embedding-torch==0.9.1
