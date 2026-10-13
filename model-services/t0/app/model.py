@@ -12,12 +12,12 @@ from t0 import T0Forecaster, batch_series
 
 class T0Model:
     """
-    t0 forecasting model wrapper (The Forecasting Company; t0-alpha, t0-beta).
+    t0 forecasting model wrapper (The Forecasting Company; t0-alpha, t0-beta, t0-gamma).
 
     t0-alpha's native quantile levels are 0.1, 0.25, 0.5, 0.75 and 0.9, and the
-    package interpolates the other deciles between them. t0-beta's native grid
-    (0.01..0.99 in steps of 0.05) holds every decile. Either way the point forecast
-    is the native median.
+    package interpolates the other deciles between them. The native grid of t0-beta
+    and t0-gamma (0.01..0.99 in steps of 0.05) holds every decile. Either way the
+    point forecast is the native median.
     """
 
     QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -28,9 +28,10 @@ class T0Model:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         model_id = os.getenv("MODEL_ID", "theforecastingcompany/t0-alpha")
+        revision = os.getenv("MODEL_REVISION") or None
         # fp32: the package only autocasts for bf16/fp16, and proteus' Turing GPUs
         # have no native bf16.
-        self.model = T0Forecaster.from_pretrained(model_id).to(self.device).eval()
+        self.model = T0Forecaster.from_pretrained(model_id, revision=revision).to(self.device).eval()
 
         # Series per forward pass; bounds GPU memory on large rounds.
         self.batch_size = int(os.getenv("T0_BATCH_SIZE", "64"))
@@ -39,7 +40,7 @@ class T0Model:
         self.max_context = int(os.getenv("T0_MAX_CONTEXT", "8192"))
 
         logger.info(
-            f"t0 initialized (model={model_id}, device={self.device}, "
+            f"t0 initialized (model={model_id}, revision={revision or 'main'}, device={self.device}, "
             f"native_levels={list(self.model.config.quantile_levels)})"
         )
 
