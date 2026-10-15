@@ -1,0 +1,38 @@
+services:
+  timestral-template: &timestral-template
+    extends:
+      file: base.yml
+      service: gpu-model-base
+    image: timestral
+    build:
+      context: ../model-services/timestral
+      dockerfile: Dockerfile
+    profiles: ["timestral", "all-models"]
+
+  timestral-5m:
+    <<: *timestral-template
+    environment:
+      - MODEL_ID=mistralai/Timestral-5M
+      - MODEL_REVISION=bdd20cfc15a3fea0e4cb5ccef37f8d3ca7aa335f
+      - HF_HOME=/models/huggingface
+
+  timestral-28m:
+    <<: *timestral-template
+    environment:
+      - MODEL_ID=mistralai/Timestral-28M
+      - MODEL_REVISION=180698bbf5a50dda3516aa6419798437fb03a430
+      - HF_HOME=/models/huggingface
+
+  timestral-123m:
+    <<: *timestral-template
+    environment:
+      - MODEL_ID=mistralai/Timestral-123M
+      - MODEL_REVISION=5a147287addda85f6acd8da3fb8858fe9af7e8f7
+      - HF_HOME=/models/huggingface
+
+  timestral-209m:
+    <<: *timestral-template
+    environment:
+      - MODEL_ID=mistralai/Timestral-209M
+      - MODEL_REVISION=9874d252ab0aae16f7f7c999f98f98d6ad7d8365
+      - HF_HOME=/models/huggingface
