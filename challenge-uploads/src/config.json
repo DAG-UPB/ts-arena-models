@@ -631,7 +631,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 32
     },
     "timestral-28m": {
         "name": "mistralai/Timestral-28M",
@@ -645,7 +645,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 32
     },
     "timestral-123m": {
         "name": "mistralai/Timestral-123M",
@@ -659,7 +659,7 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 32
     },
     "timestral-209m": {
         "name": "mistralai/Timestral-209M",
@@ -673,6 +673,6 @@
         "parameters": {
             "additionalProp1": {}
         },
-        "organization_id": null
+        "organization_id": 32
     }
 }
