@@ -1,0 +1,13 @@
+# Pinned 2026-10-15 to the versions verified locally with all four checkpoints.
+# Floating specifiers let a cold rebuild jump major versions and silently change
+# model behaviour (models #21). Bump deliberately, then rebuild and test.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+torch==2.13.0
+python-dateutil==2.9.0.post0
+# Not on PyPI: the source archive of a fixed commit, so the build needs no git.
+timestral @ https://github.com/mistralai/timestral/archive/a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff.tar.gz
+numpy==2.5.3
+huggingface-hub==2.0.0
+safetensors==0.8.0

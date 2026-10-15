@@ -618,5 +618,61 @@
             "additionalProp1": {}
         },
         "organization_id": 28
+    },
+    "timestral-5m": {
+        "name": "mistralai/Timestral-5M",
+        "model_type": "TSFM",
+        "model_family": "timestral",
+        "model_size": 5,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Mostly synthetic (univariate processes combined into multivariate series), then post-trained on a mix of real and synthetic data (real corpora not disclosed)",
+        "publishing_date": "2026-10-15",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 32
+    },
+    "timestral-28m": {
+        "name": "mistralai/Timestral-28M",
+        "model_type": "TSFM",
+        "model_family": "timestral",
+        "model_size": 28,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Mostly synthetic (univariate processes combined into multivariate series), then post-trained on a mix of real and synthetic data (real corpora not disclosed)",
+        "publishing_date": "2026-10-15",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 32
+    },
+    "timestral-123m": {
+        "name": "mistralai/Timestral-123M",
+        "model_type": "TSFM",
+        "model_family": "timestral",
+        "model_size": 123,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Mostly synthetic (univariate processes combined into multivariate series), then post-trained on a mix of real and synthetic data (real corpora not disclosed)",
+        "publishing_date": "2026-10-15",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 32
+    },
+    "timestral-209m": {
+        "name": "mistralai/Timestral-209M",
+        "model_type": "TSFM",
+        "model_family": "timestral",
+        "model_size": 209,
+        "hosting": "UPB",
+        "architecture": "decoder-only",
+        "pretraining_data": "Mostly synthetic (univariate processes combined into multivariate series), then post-trained on a mix of real and synthetic data (real corpora not disclosed)",
+        "publishing_date": "2026-10-15",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 32
     }
 }
