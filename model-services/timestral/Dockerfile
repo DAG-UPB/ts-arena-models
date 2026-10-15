@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu12
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# torch's Triton overrides for some CUDA ops need a C compiler at runtime, which the
+# slim image lacks. Off, those ops run on the standard CUDA kernels.
+ENV TORCH_DISABLE_NATIVE_JIT=1
+
 COPY app/ ./app/
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
