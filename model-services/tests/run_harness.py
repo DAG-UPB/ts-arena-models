@@ -19,6 +19,9 @@ Usage examples:
 
   # Also works from repo root:
   uv run model-services/tests/run_harness.py --url http://localhost:8001/predict
+
+  # Add the accuracy plausibility check (see plausibility.py)
+  uv run model-services/tests/run_harness.py --url http://localhost:8001/predict --plausibility
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from datetime import datetime, timedelta
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import plausibility  # noqa: E402
 import quantile_contract  # noqa: E402
 
 
@@ -168,6 +172,39 @@ def run(args: argparse.Namespace) -> int:
         print("errors: none (all structural checks passed)")
     print()
 
+    if not result["passed"]:
+        return 1
+    if args.plausibility:
+        return run_plausibility(args)
+    return 0
+
+
+def run_plausibility(args: argparse.Namespace) -> int:
+    cases = plausibility.build_cases()
+    payload = {
+        "history": [c["history"] for c in cases],
+        "horizon": plausibility.HORIZON,
+        "freq": plausibility.FREQ,
+    }
+    if args.model_name:
+        payload["model_name"] = args.model_name
+
+    try:
+        resp = post_predict(args.url, payload, args.timeout)
+    except Exception as e:
+        print(f"ERROR (plausibility check did not run): {e}")
+        return 2
+
+    result = plausibility.evaluate(resp.get("prediction"), cases)
+    print("─" * 78)
+    print(f"PLAUSIBILITY RESULT (MASE vs seasonal naive, must be < {plausibility.MAX_MASE})")
+    print("─" * 78)
+    for name, score in result["scores"].items():
+        print(f"  {name:<20} MASE {score:.3f}")
+    print(f"  {'PASS' if result['passed'] else 'FAIL'}")
+    for e in result["errors"]:
+        print(f"  - {e}")
+    print()
     return 0 if result["passed"] else 1
 
 
@@ -179,6 +216,7 @@ def main() -> int:
     p.add_argument("--freq", default="h", help="Frequency string (default 'h').")
     p.add_argument("--mode", choices=["single", "batch"], default="single", help="single (one series) or batch (list of series).")
     p.add_argument("--timeout", type=int, default=600, help="Request timeout in seconds (default 600).")
+    p.add_argument("--plausibility", action="store_true", help="Also run the accuracy plausibility check.")
     args = p.parse_args()
     return run(args)
 

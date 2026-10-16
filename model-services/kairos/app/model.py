@@ -88,8 +88,8 @@ class KairosModel:
             for series in chunk
         ]
 
-        # Left-pad with NaN; the model masks NaN as unobserved.
-        width = max(len(v) for v in values)
+        # Left-pad with NaN (masked as unobserved) to the full window; shorter inputs degrade forecasts.
+        width = self.max_context
         context = np.full((len(values), width), np.nan, dtype=np.float32)
         for i, v in enumerate(values):
             context[i, width - len(v):] = v
