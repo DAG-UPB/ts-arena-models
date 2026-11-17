@@ -1,0 +1,66 @@
+# Pinned 2026-11-18 to the versions verified with run_harness.py, including its
+# plausibility check. Floating specifiers let a cold rebuild jump major versions
+# and silently change model behaviour (models #21). Bump deliberately, then
+# rebuild and test.
+# torch comes from the CUDA 12.6 index in the Dockerfile. The torch==2.10.0 pin
+# below is satisfied by 2.10.0+cu126, which brings its own CUDA 12 libraries.
+
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+python-dateutil==2.9.0.post0
+torch==2.10.0
+continuousintelligence==0.2.0
+
+# Transitive dependencies, pinned explicitly.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.14.2
+apache-tvm-ffi==0.1.9
+certifi==2026.10.19
+click==8.4.2
+cloudpickle==3.1.2
+contourpy==1.3.3
+cuda-pathfinder==1.6.0
+cuda-toolkit==13.0.3.0
+cycler==0.12.1
+einops==0.8.2
+filelock==4.2.4
+fonttools==4.63.0
+fsspec==2026.6.0
+h11==0.16.0
+hf-xet==1.5.2
+httpcore==1.0.9
+httpx==0.28.1
+huggingface-hub==1.27.0
+idna==3.18
+jinja2==3.1.6
+kiwisolver==1.5.0
+markupsafe==3.0.3
+matplotlib==3.11.1
+ml-dtypes==0.6.0
+mpmath==1.3.0
+networkx==3.6.1
+numpy==2.5.2
+nvidia-cuda-cccl==13.0.85
+nvidia-cuda-crt==13.0.88
+nvidia-cuda-nvcc==13.0.88
+nvidia-cuda-runtime==13.0.96
+nvidia-nvvm==13.0.88
+packaging==26.3
+pandas==3.0.5
+pillow==13.0.0
+psutil==7.2.2
+pydantic-core==2.46.4
+pyparsing==3.3.2
+pyyaml==6.0.3
+setuptools==84.1.0
+six==1.17.0
+starlette==1.10.0
+sympy==1.14.0
+tilelang==0.1.8
+torch-c-dlpack-ext==0.1.5
+tqdm==4.70.0
+typing-extensions==4.16.0
+typing-inspection==0.4.2
+z3-solver==4.15.4.0

@@ -76,6 +76,7 @@ include:
   - compose/kairos.yml
   - compose/tabby.yml
   - compose/timestral.yml
+  - compose/ci-proto.yml
 
 volumes:
   arena-db:
