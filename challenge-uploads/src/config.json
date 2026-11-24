@@ -674,5 +674,19 @@
             "additionalProp1": {}
         },
         "organization_id": 32
+    },
+    "ci-proto": {
+        "name": "ContinuousIntelligence/ci-proto",
+        "model_type": "TSFM",
+        "model_family": "ci-proto",
+        "model_size": 167,
+        "hosting": "UPB",
+        "architecture": "Mamba-3 (linear recurrence)",
+        "pretraining_data": "A large corpus of real-world and synthetic time series",
+        "publishing_date": "2026-11-12",
+        "parameters": {
+            "additionalProp1": {}
+        },
+        "organization_id": 38
     }
 }
