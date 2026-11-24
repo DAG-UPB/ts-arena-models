@@ -168,7 +168,7 @@ checks therefore test structure and the rules above, never exact values.
   forecast): `naive-forecast`, `seasonal-average`, `simple-moving-average`.
 - **Model-native or sample-based quantiles:** `chronos`, `timesfm`, `timesfm2_5`, `moirai`,
   `moirai2`, `sundial`, `tabpfn-ts`, `tirex`, `flowstate`, `toto`, `toto2`, `t0`, `kairos`,
-  `tabby`, `timestral`, `visionts`.
+  `tabby`, `timestral`, `ci-proto`, `visionts`.
 
 ### Every live challenge
 
