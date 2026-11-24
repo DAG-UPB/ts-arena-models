@@ -2,7 +2,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+import json
 import os
+import tempfile
 from typing import Any, Dict, List, Union
 
 import continuousintelligence as ci
@@ -16,10 +18,12 @@ class CIProtoModel:
     """
     ci-proto forecasting model wrapper (Continuous Intelligence).
 
-    All series of one request are forecast in one call, as one cohort. Series whose
-    histories end at the same time are forecast together, and the controller's batch
-    holds a whole round. Each series' timestamps are passed with its values, for
-    ci-proto's calendar features.
+    Each series is forecast on its own: its forecast depends only on its own history,
+    not on the other series in the request. Each series' timestamps are passed with
+    its values, for ci-proto's calendar features.
+
+    CROSS_SERIES=true restores the published cohort mode, in which series whose
+    histories end at the same time are forecast jointly in chunks.
     """
 
     QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -37,10 +41,21 @@ class CIProtoModel:
             name: hf_hub_download(model_id, name, revision=revision)
             for name in ("model.ckpt", "tta.json")
         }
+        self.cross_series = os.getenv("CROSS_SERIES", "false").lower() in ("1", "true", "yes")
+        tta_path = paths["tta.json"]
+        if not self.cross_series:
+            # Without chunking and neighbour rows, every series is a case of its own.
+            with open(tta_path) as f:
+                tta = json.load(f)
+            tta.update(chunk_joint=0, joint_neighbours=0, static_groups=0)
+            tta_path = os.path.join(tempfile.mkdtemp(prefix="ci-proto-"), "tta.json")
+            with open(tta_path, "w") as f:
+                json.dump(tta, f)
+
         # "auto" runs on the GPU when PyTorch can use CUDA, otherwise on the CPU. The
         # package picks its fused Mamba-3 kernels only on Ampere or newer GPUs with a
         # 580-series driver, and its portable PyTorch backend everywhere else.
-        self.model = ci.load_model(paths["model.ckpt"], paths["tta.json"], device="auto")
+        self.model = ci.load_model(paths["model.ckpt"], tta_path, device="auto")
 
         levels = self.model.quantiles.tolist()
         if len(levels) != len(self.QUANTILE_LEVELS) or any(
@@ -50,7 +65,8 @@ class CIProtoModel:
 
         logger.info(
             f"ci-proto initialized (model={model_id}, revision={revision or 'main'}, "
-            f"device={self.model.device}, backend={self.model.backend})"
+            f"device={self.model.device}, backend={self.model.backend}, "
+            f"cross_series={self.cross_series})"
         )
 
     def predict(

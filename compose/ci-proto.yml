@@ -12,3 +12,4 @@ services:
       - MODEL_ID=ContinuousIntelligence/ci-proto
       - MODEL_REVISION=ee3031351a151e3f6febf8c62b53e6ea1008bef6
       - HF_HOME=/models/huggingface
+      - CROSS_SERIES=false

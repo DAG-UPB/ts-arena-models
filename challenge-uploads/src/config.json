@@ -681,7 +681,7 @@
         "model_family": "ci-proto",
         "model_size": 167,
         "hosting": "UPB",
-        "architecture": "decoder-only",
+        "architecture": "Mamba-3 (linear recurrence)",
         "pretraining_data": "A large corpus of real-world and synthetic time series",
         "publishing_date": "2026-11-12",
         "parameters": {
