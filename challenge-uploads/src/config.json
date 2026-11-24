@@ -682,7 +682,8 @@
         "model_size": 167,
         "hosting": "UPB",
         "architecture": "Mamba-3 (linear recurrence)",
-        "pretraining_data": "A large corpus of real-world and synthetic time series. Uses ci-proto, released by Continuous Intelligence. Continuous Intelligence does not endorse or approve this product or service.",
+        "pretraining_data": "A large corpus of real-world and synthetic time series",
+        "description": "Uses ci-proto, released by Continuous Intelligence. Continuous Intelligence does not endorse or approve this product or service.",
         "publishing_date": "2026-11-12",
         "parameters": {
             "additionalProp1": {}
